@@ -46,17 +46,64 @@ distance roadMap city1 city2
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-adjacent :: RoadMap -> City -> [(City,Distance)]
-adjacent = undefined
+ --4.4 - Return the list of cities adjacent to a given city
 
+adjacent :: RoadMap -> City -> [(City,Distance)]
+adjacent roadMap city = [(if c1 == city then c2 else c1, d) | (c1, c2, d) <- roadMap, c1 == city || c2 == city]
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--4.5 - Return the distance of a path
 pathDistance :: RoadMap -> Path -> Maybe Distance
-pathDistance = undefined
+pathDistance roadMap [] = Just 0 -- Sem cidades no caminho, logo a distância é 0
+pathDistance roadMap [_] = Just 0 -- Só uma cidade no caminho, logo a distância é 0
+pathDistance roadMap (c1:c2:xs) =
+    case distance roadMap c1 c2 of
+        Nothing -> Nothing -- Não existe caminho entre as duas cidades
+        Just distance -> case pathDistance roadMap (c2:xs) of
+            Nothing -> Nothing -- Não existe caminho entre as cidades seguintes
+            Just restDistance -> Just (distance + restDistance) -- Existe caminho entre as cidades e as seguintes , então temos de somar o valor de c1 a c2 , com o valor de c2 até ao fim do caminho que conseguimos através da recursão
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--4.6 - Return the names of the cities with the highest number of roads connecting to them
 
 rome :: RoadMap -> [City]
-rome = undefined
+rome roadMap = let
+    cities = removeDup [c | (c1 , c2 , _ ) <- roadMap , c <- [c1 , c2]] -- Todas as cidades existententes no roadMap , são eliminados duplicados através da função removeDup
+    in
+        let
+            adjacentCitiesWD = [(city , length (adjacent roadMap city)) | city <- cities]
+            maxAdjacents = maximum (map snd adjacentCitiesWD) -- Vai buscar o numero máximo de cidades adjacentes que uma cidade tem, que se encontra no segundo parametro de cada tuple
+        in
+            [city | (city , adj) <- adjacentCitiesWD , adj == maxAdjacents] -- Vai buscar todos as cidades que têm o número máximo de cidades adjacentes
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--4.7 - Check if the road map is strongly connected
 
 isStronglyConnected :: RoadMap -> Bool
-isStronglyConnected = undefined
+isStronglyConnected roadMap = let
+    cities = removeDup [c | (c1,c2,_) <- roadMap , c <- [c1,c2]] -- Todas as cidades existententes no roadMap , são eliminados duplicados através da função removeDup
+    in
+        all (\c1 -> length (dfs roadMap c1) == length cities) cities -- Para todas as cidades , verifica se existe um caminho entre elas , se existir para todas as cidades então o grafo é fortemente conectado
+
+dfs :: RoadMap -> City -> [City] -- Função para fazer a procurar em profundidade, usada para o strong connected
+dfs roadMap city = dfsAux roadMap city []
+
+dfsAux :: RoadMap -> City -> [City] -> [City]
+dfsAux roadMap city visited
+    | city `elem` visited = visited -- Se já estiver visitado , então não é necessário visitar novamente, logo retorna-se a lista de cidades visitadas
+    | otherwise = -- Se não estiver visitado
+        let
+            -- Vai buscar todas as cidades adjacentes
+            adjacentCities = adjacent roadMap city
+            -- Elimina cidades que ainda não foram visitadas
+            notVisited = [c | (c, _) <- adjacentCities, c `notElem` visited]
+        in
+            -- Adiciona a cidade atual à lista de cidades visitadas e chama a função recursivamente para as cidades adjacentes
+            foldl (\acc proxCity -> dfsAux roadMap proxCity acc) (city:visited) notVisited
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 shortestPath :: RoadMap -> City -> City -> [Path]
 shortestPath = undefined
@@ -95,3 +142,19 @@ main = do
   putStrLn "Testing distance:"
   print (distance gTest1 "7" "6")
   print (distance gTest1 "3" "8")
+
+  putStrLn "Testing adjacent:"
+  print (adjacent gTest1 "7")
+  print (adjacent gTest1 "3")
+
+  putStrLn "Testing pathDistance:"
+  print (pathDistance gTest1 ["7","6","5","4"])
+  print (pathDistance gTest1 ["7","6","5","4","3","2","1","0"])
+
+  putStrLn "Testing rome:"
+  print (rome gTest1)
+  print (rome gTest3)
+
+  putStrLn "Testing isStronglyConnected:"
+  print (isStronglyConnected gTest1)
+  print (isStronglyConnected gTest3)
