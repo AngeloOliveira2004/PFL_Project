@@ -12,8 +12,15 @@ type Distance = Int
 
 type RoadMap = [(City,City,Distance)]
 
+removeDup:: (Eq a) => [a] -> [a]
+removeDup= removeDupAux (==)
+
+removeDupAux :: (a -> a -> Bool) -> [a] -> [a]
+removeDupAux eq [] = []
+removeDupAux eq (x:xs) = x : removeDupAux eq (filter (not . eq x) xs)
+
 cities :: RoadMap -> [City]
-cities = undefined -- modifiy this line to implement the solution, for each exercise not solved, leave the function definition like this
+cities roadMap = removeDup [city | (city1 , city2 , _ ) <- roadMap , city <- [city1 , city2]]
 
 areAdjacent :: RoadMap -> City -> City -> Bool
 areAdjacent = undefined
@@ -54,4 +61,11 @@ gTest3 = [("0","1",4),("2","3",2)]
 
 main :: IO ()
 main = do
-    print $ cities gTest1
+  putStrLn "Testing gTest1:"
+  print (cities gTest1)
+
+  putStrLn "Testing gTest2:"
+  print (cities gTest2)
+
+  putStrLn "Testing gTest3:"
+  print (cities gTest3)
