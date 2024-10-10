@@ -12,6 +12,8 @@ type Distance = Int
 
 type RoadMap = [(City,City,Distance)]
 
+--4.1 - Return all the cities in the road map
+
 removeDup:: (Eq a) => [a] -> [a]
 removeDup= removeDupAux (==)
 
@@ -21,12 +23,28 @@ removeDupAux eq (x:xs) = x : removeDupAux eq (filter (not . eq x) xs)
 
 cities :: RoadMap -> [City]
 cities roadMap = removeDup [city | (city1 , city2 , _ ) <- roadMap , city <- [city1 , city2]]
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--4.2 - Check if two cities are adjacent
 
 areAdjacent :: RoadMap -> City -> City -> Bool
-areAdjacent = undefined
+areAdjacent roadMap city1 city2 =
+    any (\(c1 , c2 , _) -> (c1 == city1 && c2 == city2) || (c1 == city2 && c2 == city1)) roadMap
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--4.3 - Return the distance between two cities
 
 distance :: RoadMap -> City -> City -> Maybe Distance
-distance = undefined
+distance roadMap city1 city2
+        | null city1 = Nothing
+        | null city2 = Nothing
+        | city1 == city2 = Just 0
+        | otherwise = case [d | (c1 , c2 , d) <- roadMap , (c1 == city1 && c2 == city2) || (c1 == city2 && c2 == city1)] of
+            [] -> Nothing
+            (d:_) -> Just d
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 adjacent :: RoadMap -> City -> [(City,Distance)]
 adjacent = undefined
@@ -69,3 +87,11 @@ main = do
 
   putStrLn "Testing gTest3:"
   print (cities gTest3)
+
+  putStrLn "Testing areAdjacent:"
+  print (areAdjacent gTest1 "7" "6")
+  print (areAdjacent gTest1 "3" "8")
+
+  putStrLn "Testing distance:"
+  print (distance gTest1 "7" "6")
+  print (distance gTest1 "3" "8")
