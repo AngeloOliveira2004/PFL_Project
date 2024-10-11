@@ -50,6 +50,7 @@ distance roadMap city1 city2
 
 adjacent :: RoadMap -> City -> [(City,Distance)]
 adjacent roadMap city = [(if c1 == city then c2 else c1, d) | (c1, c2, d) <- roadMap, c1 == city || c2 == city]
+
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 --4.5 - Return the distance of a path
@@ -86,10 +87,10 @@ isStronglyConnected roadMap = let
     citiesVar = cities roadMap -- Todas as cidades existententes no roadMap , são eliminados duplicados através da função removeDup
     startCity = head citiesVar -- Vai buscar a primeira cidade
     in
-        length (dfsAux roadMap startCity []) == length citiesVar -- Para todas as cidades , verifica se existe um caminho entre elas , se existir para todas as cidades então o grafo é fortemente conectado
+        length (dfs roadMap startCity []) == length citiesVar -- Para todas as cidades , verifica se existe um caminho entre elas , se existir para todas as cidades então o grafo é fortemente conectado
 
-dfsAux :: RoadMap -> City -> [City] -> [City]
-dfsAux roadMap city visited
+dfs :: RoadMap -> City -> [City] -> [City]
+dfs roadMap city visited
     | city `elem` visited = visited -- Se já estiver visitado , então não é necessário visitar novamente, logo retorna-se a lista de cidades visitadas
     | otherwise = -- Se não estiver visitado
         let
@@ -99,10 +100,42 @@ dfsAux roadMap city visited
             notVisited = [c | (c, _) <- adjacentCities, c `notElem` visited]
         in
             -- Adiciona a cidade atual à lista de cidades visitadas e chama a função recursivamente para as cidades adjacentes
-            foldr (dfsAux roadMap) (city:visited) notVisited
+            foldr (dfs roadMap) (city:visited) notVisited
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+--4.8 - Return the shortest path between two cities
+{-
+vector<int> shortestPath(vector<vector<int>>& edges, int N,int M, int src){
+        vector<int>adj[N];
+        for(auto it:edges){
+            int u=it[0];
+            int v=it[1];
+            adj[u].push_back(v);
+            adj[v].push_back(u);
+        }
+        vector<int>dist(N,-1);
+        dist[src]=0;
+        queue<pair<int,int>>q;
+        q.push({src,0});
+        while(!q.empty()){
+            int node=q.front().first;
+            int d=q.front().second;
+            q.pop();
+            for(auto it:adj[node]){
+                if(dist[it]==-1){
+                    dist[it]=d+1;
+                    q.push({it,d+1});
+                }
+            }
+        }
+        return dist;
+    }s
+-}
+--We can use the same logic as the code above, but instead of using a list and always pick the head
+
+initialize :: RoadMap -> [(City,Distance)]
+initialize roadMap = [(city , -1) | city <- cities roadMap]
 shortestPath :: RoadMap -> City -> City -> [Path]
 shortestPath = undefined
 
