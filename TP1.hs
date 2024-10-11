@@ -69,10 +69,10 @@ pathDistance roadMap (c1:c2:xs) =
 
 rome :: RoadMap -> [City]
 rome roadMap = let
-    cities = removeDup [c | (c1 , c2 , _ ) <- roadMap , c <- [c1 , c2]] -- Todas as cidades existententes no roadMap , são eliminados duplicados através da função removeDup
+    citiesVar = cities roadMap -- Todas as cidades existententes no roadMap , são eliminados duplicados através da função removeDup
     in
         let
-            adjacentCitiesWD = [(city , length (adjacent roadMap city)) | city <- cities]
+            adjacentCitiesWD = [(city , length (adjacent roadMap city)) | city <- citiesVar]
             maxAdjacents = maximum (map snd adjacentCitiesWD) -- Vai buscar o numero máximo de cidades adjacentes que uma cidade tem, que se encontra no segundo parametro de cada tuple
         in
             [city | (city , adj) <- adjacentCitiesWD , adj == maxAdjacents] -- Vai buscar todos as cidades que têm o número máximo de cidades adjacentes
@@ -83,12 +83,10 @@ rome roadMap = let
 
 isStronglyConnected :: RoadMap -> Bool
 isStronglyConnected roadMap = let
-    cities = removeDup [c | (c1,c2,_) <- roadMap , c <- [c1,c2]] -- Todas as cidades existententes no roadMap , são eliminados duplicados através da função removeDup
+    citiesVar = cities roadMap -- Todas as cidades existententes no roadMap , são eliminados duplicados através da função removeDup
+    startCity = head citiesVar -- Vai buscar a primeira cidade
     in
-        all (\c1 -> length (dfs roadMap c1) == length cities) cities -- Para todas as cidades , verifica se existe um caminho entre elas , se existir para todas as cidades então o grafo é fortemente conectado
-
-dfs :: RoadMap -> City -> [City] -- Função para fazer a procurar em profundidade, usada para o strong connected
-dfs roadMap city = dfsAux roadMap city []
+        length (dfsAux roadMap startCity []) == length citiesVar -- Para todas as cidades , verifica se existe um caminho entre elas , se existir para todas as cidades então o grafo é fortemente conectado
 
 dfsAux :: RoadMap -> City -> [City] -> [City]
 dfsAux roadMap city visited
@@ -101,7 +99,7 @@ dfsAux roadMap city visited
             notVisited = [c | (c, _) <- adjacentCities, c `notElem` visited]
         in
             -- Adiciona a cidade atual à lista de cidades visitadas e chama a função recursivamente para as cidades adjacentes
-            foldl (\acc proxCity -> dfsAux roadMap proxCity acc) (city:visited) notVisited
+            foldr (dfsAux roadMap) (city:visited) notVisited
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
