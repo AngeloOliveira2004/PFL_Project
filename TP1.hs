@@ -1,7 +1,6 @@
 import qualified Data.List
 import qualified Data.Array
 import qualified Data.Bits
-
 -- PFL 2024/2025 Practical assignment 1
 
 -- Uncomment the some/all of the first three lines to import the modules, do not change the code of these lines.
@@ -49,7 +48,9 @@ distance roadMap city1 city2
  --4.4 - Return the list of cities adjacent to a given city
 
 adjacent :: RoadMap -> City -> [(City,Distance)]
-adjacent roadMap city = [(if c1 == city then c2 else c1, d) | (c1, c2, d) <- roadMap, c1 == city || c2 == city]
+adjacent roadMap city 
+        | null city = []
+        | otherwise = [(if c1 == city then c2 else c1, d) | (c1, c2, d) <- roadMap, c1 == city || c2 == city]
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -77,7 +78,7 @@ rome roadMap = let
             maxAdjacents = maximum (map snd adjacentCitiesWD) -- Vai buscar o numero máximo de cidades adjacentes que uma cidade tem, que se encontra no segundo parametro de cada tuple
         in
             [city | (city , adj) <- adjacentCitiesWD , adj == maxAdjacents] -- Vai buscar todos as cidades que têm o número máximo de cidades adjacentes
-
+            
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 --4.7 - Check if the road map is strongly connected
@@ -132,12 +133,95 @@ vector<int> shortestPath(vector<vector<int>>& edges, int N,int M, int src){
         return dist;
     }s
 -}
---We can use the same logic as the code above, but instead of using a list and always pick the head
 
-initialize :: RoadMap -> [(City,Distance)]
-initialize roadMap = [(city , -1) | city <- cities roadMap]
-shortestPath :: RoadMap -> City -> City -> [Path]
-shortestPath = undefined
+--We can use the same logic as the code above, but instead of using a list and always pick the head
+type DistanceToCity = (City,Distance)
+
+initialize :: [City] -> City -> [(City, Distance)]
+initialize cities source = [(city, if city == source then 0 else -1) | city <- cities]
+
+-- Update the distance in the distance list
+distancesUpdate :: [DistanceToCity] -> City -> Int -> [DistanceToCity]
+distancesUpdate [] _ _ = []
+distancesUpdate ((city, distance):xs) cityToUpdate newDistance
+    | city == cityToUpdate = (city, newDistance) : distancesUpdate xs cityToUpdate newDistance
+    | otherwise = (city, distance) : distancesUpdate xs cityToUpdate newDistance
+
+-- Get adjacent cities with their distances
+adjacentCitiesDistance :: RoadMap -> City -> [DistanceToCity]
+adjacentCitiesDistance roadMap city = [(if c1 == city then c2 else c1, dist) | (c1, c2, dist) <- roadMap, c1 == city || c2 == city]
+
+-- Get the city with the minimum distance that hasn't been visited
+minDistanceCity :: [DistanceToCity] -> [City] -> Maybe City
+minDistanceCity distances visited = 
+    let unvisitedDistances = filter (\(city, dist) -> dist /= -1 && city `notElem` visited) distances
+    in if null unvisitedDistances
+       then Nothing
+       else Just (fst (Data.List.minimumBy (\(_, d1) (_, d2) -> compare d1 d2) unvisitedDistances))
+
+       
+fromMaybe :: a -> Maybe a -> a
+fromMaybe x Nothing = x
+fromMaybe _ (Just x) = x
+
+isNothing :: Maybe a -> Bool
+isNothing Nothing = True
+isNothing _ = False
+       
+-- Dijkstra's algorithm using only lists
+-- Dijkstra's algorithm using only lists
+dijkstra :: RoadMap -> [City] -> City -> [(City, Distance)] -> [(City, Maybe City)] -> [(City, Distance)]
+dijkstra roadMap cities source distances predecessors = dijkstra' distances [] predecessors
+  where
+    dijkstra' dist visited preds
+      | length visited == length cities = dist
+      | otherwise =
+          let currentCity = fromMaybe "" (minDistanceCity dist visited)
+              currentDist = fromMaybe (-1) (lookup currentCity dist)
+              adjCities = adjacentCitiesDistance roadMap currentCity
+              updatedDist = foldl (updateDistances currentCity currentDist) dist adjCities
+              newVisited = currentCity : visited
+          in dijkstra' updatedDist newVisited (updatePredecessors currentCity currentDist preds adjCities)
+
+    updateDistances currCity currDist distances (adjCity, adjDist) =
+      let totalDist = currDist + adjDist
+          oldDist = fromMaybe maxBound (lookup adjCity distances)
+      in if oldDist == -1 || totalDist < oldDist
+         then distancesUpdate distances adjCity totalDist
+         else distances
+
+    -- Update the predecessor list to reflect (City, Maybe City)
+    updatePredecessors :: City -> Int -> [(City, Maybe City)] -> [DistanceToCity] -> [(City, Maybe City)]
+    updatePredecessors currCity currDist preds adjCities =
+      [if adjCity == targetCity && (isNothing oldPred || currDist + adjDist < fromMaybe maxBound (lookup targetCity distances))
+       then (targetCity, Just currCity)  -- Use City as the predecessor
+       else (targetCity, oldPred)
+       | (targetCity, oldPred) <- preds,
+         (adjCity, adjDist) <- adjCities]
+
+-- Reconstruct the shortest path from the source to the destination
+reconstructPath :: [(City, Maybe City)] -> City -> City -> Path
+reconstructPath preds src dest = reverse $ Data.List.unfoldr step (Just dest)
+  where
+    step Nothing = Nothing
+    step (Just city)
+      | city == src = Just (city, Nothing)
+      | otherwise = case lookup city preds of
+                      Just (Just predCity) -> Just (city, Just predCity)
+                      _ -> Nothing
+
+-- Shortest path function
+shortestPath :: RoadMap -> City -> City -> Path
+shortestPath roadMap source destination
+  | source == destination = [source]
+  | otherwise =
+      let cities = Data.List.nub (concat [[c1, c2] | (c1, c2, _) <- roadMap])
+          distances = initialize cities source
+          predecessors = [(city, Nothing :: Maybe City) | city <- cities]  -- Initialize with Maybe City
+          finalDistances = dijkstra roadMap cities source distances predecessors
+      in reconstructPath predecessors source destination
+
+      --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 travelSales :: RoadMap -> Path
 travelSales = undefined
@@ -189,3 +273,7 @@ main = do
   putStrLn "Testing isStronglyConnected:"
   print (isStronglyConnected gTest1)
   print (isStronglyConnected gTest3)
+
+  putStrLn "Testing shortestPath:"
+  print (shortestPath gTest1 "0" "4")
+  print (shortestPath gTest2 "0" "3")
