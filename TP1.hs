@@ -118,7 +118,7 @@ adjacentWithDistances roadMap city = [(if c1 == city then c2 else c1, dist) | (c
 allPathsWithDistances :: RoadMap -> City -> City -> PathWithDistances -> [PathWithDistances]
 allPathsWithDistances roadMap source destination visited
     -- If source equals destination, a path is found
-    | source == destination = [visited ++ [(destination, 0)]]  -- Append destination with 0 as the last distance
+    |  source == destination = [visited ++ [(destination, 0)]]  -- Append destination with 0 as the last distance
     -- Otherwise, explore unvisited adjacent cities
     | otherwise = concat 
         [ allPathsWithDistances roadMap adj destination (visited ++ [(source, dist)]) 
@@ -142,8 +142,29 @@ shortestPath roadMap source destination
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+allPathsWithDistances' :: RoadMap -> City -> City -> Int -> PathWithDistances -> [PathWithDistances]
+allPathsWithDistances' roadMap source destination totalCities visited
+    -- If source equals destination and all cities are visited, a Hamiltonian path is found
+    | source == destination && length visited + 1 == totalCities = [visited ++ [(destination, 0)]]
+    -- Otherwise, explore unvisited adjacent cities
+    | otherwise = concat 
+        [ allPathsWithDistances' roadMap adj destination totalCities (visited ++ [(source, dist)]) 
+        | (adj, dist) <- adjacentWithDistances roadMap source, adj `notElem` map fst visited]
+
+findHamiltonianPaths :: RoadMap -> City -> City -> [PathWithDistances]
+findHamiltonianPaths roadMap source destination = allPathsWithDistances' roadMap source destination numCities []
+    where
+    -- Calculate the total number of unique cities
+    numCities = length $ Data.List.nub $ concat [[c1, c2] | (c1, c2, _) <- roadMap]
+
 travelSales :: RoadMap -> Path
-travelSales = undefined
+travelSales roadMap 
+    | null paths = []  -- No path found
+    | otherwise = head [map fst path | path <- paths, totalDistance path == minimumDist]
+    where
+        paths = findHamiltonianPaths roadMap startCity startCity
+        startCity = head $ cities roadMap
+        minimumDist = minimum [totalDistance path | path <- paths]
 
 tspBruteForce :: RoadMap -> Path
 tspBruteForce = undefined -- only for groups of 3 people; groups of 2 people: do not edit this function
@@ -196,3 +217,7 @@ main = do
   putStrLn "Testing shortestPath:"
   print (shortestPath gTest1 "0" "4")
   --print (shortestPath gTest2 "0" "3")
+
+  putStrLn "Testing travelSales:"
+  print (travelSales gTest1)
+  print (travelSales gTest2)
