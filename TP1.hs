@@ -105,123 +105,42 @@ dfs roadMap city visited
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
---4.8 - Return the shortest path between two cities
-{-
-vector<int> shortestPath(vector<vector<int>>& edges, int N,int M, int src){
-        vector<int>adj[N];
-        for(auto it:edges){
-            int u=it[0];
-            int v=it[1];
-            adj[u].push_back(v);
-            adj[v].push_back(u);
-        }
-        vector<int>dist(N,-1);
-        dist[src]=0;
-        queue<pair<int,int>>q;
-        q.push({src,0});
-        while(!q.empty()){
-            int node=q.front().first;
-            int d=q.front().second;
-            q.pop();
-            for(auto it:adj[node]){
-                if(dist[it]==-1){
-                    dist[it]=d+1;
-                    q.push({it,d+1});
-                }
-            }
-        }
-        return dist;
-    }s
--}
+--4.8 - Shortest path between two cities
 
---We can use the same logic as the code above, but instead of using a list and always pick the head
 type DistanceToCity = (City,Distance)
+type PathWithDistances = [DistanceToCity]
 
-initialize :: [City] -> City -> [(City, Distance)]
-initialize cities source = [(city, if city == source then 0 else -1) | city <- cities]
+-- Find adjacent cities with their distances
+adjacentWithDistances :: RoadMap -> City -> [(City, Distance)]
+adjacentWithDistances roadMap city = [(if c1 == city then c2 else c1, dist) | (c1, c2, dist) <- roadMap, c1 == city || c2 == city]
 
--- Update the distance in the distance list
-distancesUpdate :: [DistanceToCity] -> City -> Int -> [DistanceToCity]
-distancesUpdate [] _ _ = []
-distancesUpdate ((city, distance):xs) cityToUpdate newDistance
-    | city == cityToUpdate = (city, newDistance) : distancesUpdate xs cityToUpdate newDistance
-    | otherwise = (city, distance) : distancesUpdate xs cityToUpdate newDistance
+-- Modified DFS function to find all paths with distances from source to destination
+allPathsWithDistances :: RoadMap -> City -> City -> PathWithDistances -> [PathWithDistances]
+allPathsWithDistances roadMap source destination visited
+    -- If source equals destination, a path is found
+    | source == destination = [visited ++ [(destination, 0)]]  -- Append destination with 0 as the last distance
+    -- Otherwise, explore unvisited adjacent cities
+    | otherwise = concat 
+        [ allPathsWithDistances roadMap adj destination (visited ++ [(source, dist)]) 
+        | (adj, dist) <- adjacentWithDistances roadMap source, adj `notElem` map fst visited]
 
--- Get adjacent cities with their distances
-adjacentCitiesDistance :: RoadMap -> City -> [DistanceToCity]
-adjacentCitiesDistance roadMap city = [(if c1 == city then c2 else c1, dist) | (c1, c2, dist) <- roadMap, c1 == city || c2 == city]
+-- Helper function to find all paths with distances from source to destination (user-facing function)
+findAllPathsWithDistances :: RoadMap -> City -> City -> [PathWithDistances]
+findAllPathsWithDistances roadMap source destination = allPathsWithDistances roadMap source destination []
 
--- Get the city with the minimum distance that hasn't been visited
-minDistanceCity :: [DistanceToCity] -> [City] -> Maybe City
-minDistanceCity distances visited = 
-    let unvisitedDistances = filter (\(city, dist) -> dist /= -1 && city `notElem` visited) distances
-    in if null unvisitedDistances
-       then Nothing
-       else Just (fst (Data.List.minimumBy (\(_, d1) (_, d2) -> compare d1 d2) unvisitedDistances))
-
-       
-fromMaybe :: a -> Maybe a -> a
-fromMaybe x Nothing = x
-fromMaybe _ (Just x) = x
-
-isNothing :: Maybe a -> Bool
-isNothing Nothing = True
-isNothing _ = False
-       
--- Dijkstra's algorithm using only lists
--- Dijkstra's algorithm using only lists
-dijkstra :: RoadMap -> [City] -> City -> [(City, Distance)] -> [(City, Maybe City)] -> [(City, Distance)]
-dijkstra roadMap cities source distances predecessors = dijkstra' distances [] predecessors
-  where
-    dijkstra' dist visited preds
-      | length visited == length cities = dist
-      | otherwise =
-          let currentCity = fromMaybe "" (minDistanceCity dist visited)
-              currentDist = fromMaybe (-1) (lookup currentCity dist)
-              adjCities = adjacentCitiesDistance roadMap currentCity
-              updatedDist = foldl (updateDistances currentCity currentDist) dist adjCities
-              newVisited = currentCity : visited
-          in dijkstra' updatedDist newVisited (updatePredecessors currentCity currentDist preds adjCities)
-
-    updateDistances currCity currDist distances (adjCity, adjDist) =
-      let totalDist = currDist + adjDist
-          oldDist = fromMaybe maxBound (lookup adjCity distances)
-      in if oldDist == -1 || totalDist < oldDist
-         then distancesUpdate distances adjCity totalDist
-         else distances
-
-    -- Update the predecessor list to reflect (City, Maybe City)
-    updatePredecessors :: City -> Int -> [(City, Maybe City)] -> [DistanceToCity] -> [(City, Maybe City)]
-    updatePredecessors currCity currDist preds adjCities =
-      [if adjCity == targetCity && (isNothing oldPred || currDist + adjDist < fromMaybe maxBound (lookup targetCity distances))
-       then (targetCity, Just currCity)  -- Use City as the predecessor
-       else (targetCity, oldPred)
-       | (targetCity, oldPred) <- preds,
-         (adjCity, adjDist) <- adjCities]
-
--- Reconstruct the shortest path from the source to the destination
-reconstructPath :: [(City, Maybe City)] -> City -> City -> Path
-reconstructPath preds src dest = reverse $ Data.List.unfoldr step (Just dest)
-  where
-    step Nothing = Nothing
-    step (Just city)
-      | city == src = Just (city, Nothing)
-      | otherwise = case lookup city preds of
-                      Just (Just predCity) -> Just (city, Just predCity)
-                      _ -> Nothing
+totalDistance :: PathWithDistances -> Distance
+totalDistance path = sum [dist | (_, dist) <- path]
 
 -- Shortest path function
-shortestPath :: RoadMap -> City -> City -> Path
+shortestPath :: RoadMap -> City -> City -> [Path]
 shortestPath roadMap source destination
-  | source == destination = [source]
-  | otherwise =
-      let cities = Data.List.nub (concat [[c1, c2] | (c1, c2, _) <- roadMap])
-          distances = initialize cities source
-          predecessors = [(city, Nothing :: Maybe City) | city <- cities]  -- Initialize with Maybe City
-          finalDistances = dijkstra roadMap cities source distances predecessors
-      in reconstructPath predecessors source destination
+    | null paths = []  -- No path found
+    | otherwise = [map fst path | path <- paths, totalDistance path == minimumDist]  -- Return all paths with the minimum distance
+    where
+        paths = findAllPathsWithDistances roadMap source destination
+        minimumDist = minimum [totalDistance path | path <- paths]      
 
-      --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 travelSales :: RoadMap -> Path
 travelSales = undefined
@@ -276,4 +195,4 @@ main = do
 
   putStrLn "Testing shortestPath:"
   print (shortestPath gTest1 "0" "4")
-  print (shortestPath gTest2 "0" "3")
+  --print (shortestPath gTest2 "0" "3")
