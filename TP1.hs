@@ -11,6 +11,51 @@ type Distance = Int
 
 type RoadMap = [(City,City,Distance)]
 
+data Heap a = Empty | Node a (Heap a) (Heap a) deriving Show -- A heap is either empty or a node with a value (a) and two heaps
+
+-- Merges two heaps
+merge :: (Ord a) => Heap a -> Heap a -> Heap a
+merge Empty h = h -- If the first heap is empty, return the second heap
+merge h Empty = h -- If the second heap is empty, return the first heap
+merge h1@(Node x left1 right1) h2@(Node y left2 right2)
+    | x <= y    = Node x (merge right1 h2) left1
+    | otherwise = Node y (merge right2 h1) left2
+
+-- Inserts a value into a heap
+insert :: (Ord a) => a -> Heap a -> Heap a
+insert x h = merge (Node x Empty Empty) h 
+
+findMinValue :: (Ord a) => Heap a -> a
+findMinValue Empty = error "Empty heap"
+findMinValue (Node x _ _) = x
+
+deleteMinValue :: (Ord a) => Heap a -> Heap a
+deleteMinValue Empty = error "Empty heap"
+deleteMinValue (Node _ left right) = merge left right
+
+isEmpty :: (Ord a) => Heap a -> Bool
+isEmpty Empty = True
+isEmpty _ = False
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 -- Remove duplicates from a list
 nub :: Eq a => [a] -> [a]
 nub [] = [] -- If the list is empty, return an empty list
@@ -221,6 +266,43 @@ solveTSP matrix currMask currCity currPath bestPath currDist bestDist
             solveTSP matrix (setBit neighbor currMask) neighbor -- Recursively call solveTSP with the neighbor as the current city
                     (currPath ++ [neighbor]) accPath -- Update the current path and best path
                     (currDist + matrix !! currCity !! neighbor) accDist -- Update the current distance and best distance
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- 4.8 Dijkstra's algorithm
+
+-- type DistanceCityTuple = (City, Distance) -- Represents a city and the distance to it
+-- type PathDistances = [DistanceCityTuple] -- Represents a path with with a city root and the distance to it
+
+getAllCitiesExceptOne :: [City] -> City -> [City]
+getAllCitiesExceptOne allCities city = filter (/=city) allCities
+
+initializePathDistance :: City -> [City] -> PathDistances
+initializePathDistance startCity cities = [(city, if city == startCity then 0 else 1000000) | city <- cities]
+
+fillHeap :: [PathDistances] -> Heap(PathDistances)
+fillHeap cities = foldr insert Empty cities
+
+dijkstra :: RoadMap -> City -> City -> Path
+dijkstra roadMap startCity endCity =
+    let allCities = getAllCitiesExceptOne (cities roadMap) startCity
+        pathDistances = initializePathDistance startCity allCities
+        initHeap = fillHeap [pathDistances]
+    in
+        dijkstraAux roadMap endCity initHeap []
+
+dijkstraAux :: RoadMap -> City -> Heap(PathDistances) -> Path -> Path
+dijkstraAux roadMap endCity heap visited
+    | isEmpty heap = []
+    | currentCity == endCity = reverse (currentCity:visited) 
+    | otherwise = 
+        let 
+            currentValue = findMinValue heap
+            newHeap = deleteMinValue heap
+
+
+
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
