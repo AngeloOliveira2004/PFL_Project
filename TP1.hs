@@ -104,38 +104,41 @@ dfs roadMap city visited
 
 --4.8 - Shortest path between two cities
 
-type DistanceToCity = (City,Distance)
-type PathWithDistances = [DistanceToCity]
+type DistanceCityTuple = (City, Distance) -- Represents a city and the distance to it
+type PathDistances = [DistanceCityTuple] -- Represents a path with with a city root and the distance to it
 
--- Find adjacent cities with their distances
-adjacentWithDistances :: RoadMap -> City -> [(City, Distance)]
-adjacentWithDistances roadMap city = [(if c1 == city then c2 else c1, dist) | (c1, c2, dist) <- roadMap, c1 == city || c2 == city]
+-- Finds the distance between two adjacent cities in the road map
 
--- Modified DFS function to find all paths with distances from source to destination
-allPathsWithDistances :: RoadMap -> City -> City -> PathWithDistances -> [PathWithDistances]
+adjacentCityDistances :: RoadMap -> City -> [DistanceCityTuple]
+adjacentCityDistances roadMap city = 
+    [(if city1 == city then city2 else city1, dist) | (city1, city2, dist) <- roadMap, city1 == city || city2 == city]
+
+-- Recursive DFS to collect all paths with distances from source to destination
+
+allPathsWithDistances :: RoadMap -> City -> City -> PathDistances -> [PathDistances]
 allPathsWithDistances roadMap source destination visited
-    -- If source equals destination, a path is found
-    |  source == destination = [visited ++ [(destination, 0)]]  -- Append destination with 0 as the last distance
-    -- Otherwise, explore unvisited adjacent cities
+    | source == destination = [visited ++ [(destination, 0)]]  -- Found a path
     | otherwise = concat
         [ allPathsWithDistances roadMap adj destination (visited ++ [(source, dist)])
-        | (adj, dist) <- adjacentWithDistances roadMap source, adj `notElem` map fst visited]
+        | (adj, dist) <- adjacentCityDistances roadMap source, adj `notElem` map fst visited ]
 
--- Helper function to find all paths with distances from source to destination (user-facing function)
-findAllPathsWithDistances :: RoadMap -> City -> City -> [PathWithDistances]
-findAllPathsWithDistances roadMap source destination = allPathsWithDistances roadMap source destination [] -- Call the modified DFS function with an empty list as the visited list
+-- Finds all paths with distances from source to destination (user-facing function)
+findAllPathsWithDistances :: RoadMap -> City -> City -> [PathDistances]
+findAllPathsWithDistances roadMap source destination = 
+    allPathsWithDistances roadMap source destination []
 
-totalDistance :: PathWithDistances -> Distance
-totalDistance path = sum [dist | (_, dist) <- path]
+-- Calculate the total distance of a path
+totalDistance :: PathDistances -> Distance
+totalDistance = sum . map snd
 
--- Shortest path function
+-- Find the shortest path(s) between source and destination
 shortestPath :: RoadMap -> City -> City -> [Path]
-shortestPath roadMap source destination
-    | null paths = []  -- No path found
-    | otherwise = [map fst path | path <- paths, totalDistance path == minimumDist]  -- Return all paths with the minimum distance
-    where
-        paths = findAllPathsWithDistances roadMap source destination -- Find all paths with distances
-        minimumDist = minimum [totalDistance path | path <- paths] -- Find the minimum distance
+shortestPath roadMap source destination = 
+    [map fst path | path <- paths, totalDistance path == minDist]
+  where
+    paths = findAllPathsWithDistances roadMap source destination
+    minDist = minimum (map totalDistance paths)
+
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -281,18 +284,20 @@ main = do
     
   putStrLn "Testing gTest1:"
   print (cities gTest1)
-
+-}
     print (isStronglyConnected gTest1)
     print (isStronglyConnected gTest2)
     print (isStronglyConnected gTest3)
 
 
-    print (travelSales gTest2)
--}
+    -- print (travelSales gTest2)
+
   --print (shortestPath gTest2 "0" "3")
+
+{-  
   putStrLn "Testing gTest1:"
   print (travelSales gTest1)
 
   putStrLn "Testing gTest2:"
   print (travelSales gTest2)
-
+-}
