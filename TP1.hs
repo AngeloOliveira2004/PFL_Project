@@ -110,34 +110,29 @@ type PathDistances = [DistanceCityTuple] -- Represents a path with with a city r
 -- Finds the distance between two adjacent cities in the road map
 
 adjacentCityDistances :: RoadMap -> City -> [DistanceCityTuple]
-adjacentCityDistances roadMap city = 
-    [(if city1 == city then city2 else city1, dist) | (city1, city2, dist) <- roadMap, city1 == city || city2 == city]
+adjacentCityDistances roadMap city = [(city2, dist) | (city1, city2, dist) <- roadMap, city1 == city] ++ [(city1, dist) | (city1, city2, dist) <- roadMap, city2 == city]
 
 -- Recursive DFS to collect all paths with distances from source to destination
 
 allPathsWithDistances :: RoadMap -> City -> City -> PathDistances -> [PathDistances]
 allPathsWithDistances roadMap source destination visited
     | source == destination = [visited ++ [(destination, 0)]]  -- Found a path
-    | otherwise = concat
+    | otherwise = 
+        let adjacentCities = adjacentCityDistances roadMap source in concat
         [ allPathsWithDistances roadMap adj destination (visited ++ [(source, dist)])
-        | (adj, dist) <- adjacentCityDistances roadMap source, adj `notElem` map fst visited ]
-
--- Finds all paths with distances from source to destination (user-facing function)
-findAllPathsWithDistances :: RoadMap -> City -> City -> [PathDistances]
-findAllPathsWithDistances roadMap source destination = 
-    allPathsWithDistances roadMap source destination []
+        | (adj, dist) <- adjacentCities, adj `notElem` map fst visited ]
 
 -- Calculate the total distance of a path
-totalDistance :: PathDistances -> Distance
-totalDistance = sum . map snd
+totalDistPath :: PathDistances -> Distance
+totalDistPath = sum . map snd
 
 -- Find the shortest path(s) between source and destination
 shortestPath :: RoadMap -> City -> City -> [Path]
 shortestPath roadMap source destination = 
-    [map fst path | path <- paths, totalDistance path == minDist]
+    [map fst path | path <- allPaths, totalDistPath path == minDistance]
   where
-    paths = findAllPathsWithDistances roadMap source destination
-    minDist = minimum (map totalDistance paths)
+    allPaths = allPathsWithDistances roadMap source destination []
+    minDistance = minimum (map totalDistPath allPaths)
 
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -285,9 +280,9 @@ main = do
   putStrLn "Testing gTest1:"
   print (cities gTest1)
 -}
-    print (isStronglyConnected gTest1)
-    print (isStronglyConnected gTest2)
-    print (isStronglyConnected gTest3)
+    -- print (isStronglyConnected gTest1)
+    -- print (isStronglyConnected gTest2)
+    -- print (isStronglyConnected gTest3)
 
 
     -- print (travelSales gTest2)
@@ -301,3 +296,5 @@ main = do
   putStrLn "Testing gTest2:"
   print (travelSales gTest2)
 -}
+  putStrLn "Testing gTest1:"
+  print (shortestPath gTest1 "0" "8")
