@@ -1,6 +1,9 @@
 import qualified Data.List
 import qualified Data.Array
 import qualified Data.Bits
+import Data.Time.Clock (getCurrentTime, diffUTCTime, UTCTime)
+import Control.Monad (forM_)
+import Data.Time.Clock
 -- PFL 2024/2025 Practical assignment 1
 
 -- Uncomment the some/all of the first three lines to import the modules, do not change the code of these lines.
@@ -108,16 +111,14 @@ type DistanceCityTuple = (City, Distance) -- Represents a city and the distance 
 type PathDistances = [DistanceCityTuple] -- Represents a path with with a city root and the distance to it
 
 -- Finds the distance between two adjacent cities in the road map
-
 adjacentCityDistances :: RoadMap -> City -> [DistanceCityTuple]
 adjacentCityDistances roadMap city = [(city2, dist) | (city1, city2, dist) <- roadMap, city1 == city] ++ [(city1, dist) | (city1, city2, dist) <- roadMap, city2 == city]
 
 -- Recursive DFS to collect all paths with distances from source to destination
-
 allPathsWithDistances :: RoadMap -> City -> City -> PathDistances -> [PathDistances]
 allPathsWithDistances roadMap source destination visited
     | source == destination = [visited ++ [(destination, 0)]]  -- Found a path
-    | otherwise = 
+    | otherwise =
         let adjacentCities = adjacentCityDistances roadMap source in concat
         [ allPathsWithDistances roadMap adj destination (visited ++ [(source, dist)])
         | (adj, dist) <- adjacentCities, adj `notElem` map fst visited ]
@@ -128,7 +129,7 @@ totalDistPath = sum . map snd
 
 -- Find the shortest path(s) between source and destination
 shortestPath :: RoadMap -> City -> City -> [Path]
-shortestPath roadMap source destination = 
+shortestPath roadMap source destination =
     [map fst path | path <- allPaths, totalDistPath path == minDistance]
   where
     allPaths = allPathsWithDistances roadMap source destination []
@@ -141,6 +142,9 @@ shortestPath roadMap source destination =
 
 -- Stores a pair (id, city) to map a id to the corresponding city
 type Dict = [(Int, City)]
+
+-- Represents the Road Map as a matrix
+type Matrix = [[Int]]
 
 -- Maps a list of cities to unique integer IDs, starting from a given ID
 mapCities :: [City] -> Int -> Dict
@@ -157,9 +161,6 @@ convertPath :: [Int] -> Dict -> Path
 convertPath [] _ = []
 convertPath (cityID:rest) citiesDict = getCityFromDict citiesDict cityID : convertPath rest citiesDict
 
--- Represents the Road Map as a matrix
-type Matrix = [[Int]]
-
 -- Creates initial matrix of distances with 1000000 if there is no edge or with the edge weight otherwise. The matrix is symmetric
 initMatrix :: Int -> Dict -> RoadMap -> Matrix
 initMatrix size dict roadMap = 
@@ -173,6 +174,7 @@ areAdjacentAux rm city1 city2 = case lookup (city1, city2) distances of
     Nothing -> (False, -1)
     where
     distances = [((c1, c2), d) | (c1, c2, d) <- rm] ++ [((c2, c1), d) | (c1, c2, d) <- rm]
+
 -- To represent mask, [0,1,0,1] is equivelent to 0b0101
 type Mask = [Int]
 
@@ -222,6 +224,38 @@ solveTSP matrix currMask currCity currPath bestPath currDist bestDist
                     (currPath ++ [neighbor]) accPath -- Update the current path and best path
                     (currDist + matrix !! currCity !! neighbor) accDist -- Update the current distance and best distance
 
+
+-------------------------------------------------------------------------------------------------------------------------
+
+-- Recursive DFS to collect all paths visiting each city exactly once, returning to the start
+tspPaths :: RoadMap -> City -> [City] -> PathDistances -> [PathDistances]
+tspPaths roadMap start unvisited visited
+    | null unvisited = case lookup start (adjacentCityDistances roadMap (fst (last visited))) of
+        Just returnDist -> [visited ++ [(start, returnDist)]]  -- Cycle complete
+        Nothing -> []  -- No return path, incomplete cycle
+    | otherwise =
+        concat [ tspPaths roadMap start (filter (/= adj) unvisited) (visited ++ [(adj, dist)])
+               | (adj, dist) <- adjacentCityDistances roadMap (fst (last visited)), adj `elem` unvisited ]
+
+-- Solves TSP by finding the shortest cycle visiting all cities from a starting city
+tspShortestPath :: RoadMap -> PathDistances
+tspShortestPath roadMap = if null allCycles then [] else minimumBy compareDist allCycles
+  where
+    allCities = cities roadMap
+    start = head allCities
+    allCycles = tspPaths roadMap start (filter (/= start) allCities) [(start, 0)]
+    compareDist p1 p2 = compare (totalDistPath p1) (totalDistPath p2)
+    
+
+-- Helper function to find the minimum by a specific criterion
+minimumBy :: (a -> a -> Ordering) -> [a] -> a
+minimumBy _ [] = error "minimumBy: empty list"
+minimumBy cmp (x:xs) = foldl (\acc y -> if cmp y acc == LT then y else acc) x xs
+
+roadMap :: RoadMap
+roadMap = [("A", "B", 10), ("A", "C", 15), ("A", "D", 20), 
+           ("B", "C", 35), ("B", "D", 25), ("C", "D", 30)]
+
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 tspBruteForce :: RoadMap -> Path
@@ -237,64 +271,48 @@ gTest2 = [("0","1",10),("0","2",15),("0","3",20),("1","2",35),("1","3",25),("2",
 gTest3 :: RoadMap -- unconnected graph
 gTest3 = [("0","1",4),("2","3",2)]
 
+gTest4 :: RoadMap
+gTest4 = [("A", "B", 10), ("A", "C", 15), ("A", "D", 20), ("A", "E", 25), ("A", "F", 30),
+          ("B", "C", 35), ("B", "D", 40), ("B", "E", 45), ("B", "F", 50),
+          ("C", "D", 55), ("C", "E", 60), ("C", "F", 65),
+          ("D", "E", 70), ("D", "F", 75),
+          ("E", "F", 80)]
+
+-- Time wrapper for travelSales
+timeTravelSales :: RoadMap -> IO (Path, NominalDiffTime)
+timeTravelSales roadmap = do
+    start <- getCurrentTime
+    let result = travelSales roadmap
+    end <- getCurrentTime
+    let duration = diffUTCTime end start
+    return (result, duration)
+
+-- Timing wrapper for tspShortestPath
+timeTspShortestPath :: RoadMap -> IO (PathDistances, NominalDiffTime)
+timeTspShortestPath roadmap = do
+    start <- getCurrentTime
+    let result = tspShortestPath roadmap
+    end <- getCurrentTime
+    let duration = diffUTCTime end start
+    return (result, duration)
+
+-- Function to accumulate total time for multiple test cases
+totalTime :: [IO (a, NominalDiffTime)] -> IO NominalDiffTime
+totalTime tests = do
+    times <- mapM (fmap snd) tests
+    return (sum times)
+
+-- Test all functions with all test cases
 main :: IO ()
 main = do
-    {-
-  putStrLn "Testing gTest1:"
-  print (cities gTest1)
+    putStrLn "Calculating total time for travelSales and tspShortestPath functions on all test cases..."
 
-  putStrLn "Testing gTest2:"
-  print (cities gTest2)
+    let travelSalesTests = [timeTravelSales gTest1, timeTravelSales gTest2, timeTravelSales gTest3, timeTravelSales gTest4]
+    totalTravelSalesTime <- totalTime travelSalesTests
 
-  putStrLn "Testing gTest3:"
-  print (cities gTest3)
+    let tspShortestPathTests = [timeTspShortestPath gTest1, timeTspShortestPath gTest2, timeTspShortestPath gTest3, timeTspShortestPath gTest4]
+    totalTspShortestPathTime <- totalTime tspShortestPathTests
 
-  putStrLn "Testing areAdjacent:"
-  print (areAdjacent gTest1 "7" "6")
-  print (areAdjacent gTest1 "3" "8")
+    putStrLn $ "\nTotal time for travelSales: " ++ show totalTravelSalesTime
+    putStrLn $ "Total time for tspShortestPath: " ++ show totalTspShortestPathTime
 
-  putStrLn "Testing distance:"
-  print (distance gTest1 "7" "6")
-  print (distance gTest1 "3" "8")
-
-  putStrLn "Testing adjacent:"
-  print (adjacent gTest1 "7")
-  print (adjacent gTest1 "3")
-
-  putStrLn "Testing pathDistance:"
-  print (pathDistance gTest1 ["7","6","5","4"])
-  print (pathDistance gTest1 ["7","6","5","4","3","2","1","0"])
-
-  putStrLn "Testing rome:"
-  print (rome gTest1)
-  print (rome gTest3)
-
-  putStrLn "Testing isStronglyConnected:"
-  print (isStronglyConnected gTest1)
-  print (isStronglyConnected gTest3)
-    
-
-  putStrLn "Testing shortestPath:"
-  print (shortestPath gTest1 "0" "10000")
-    
-  putStrLn "Testing gTest1:"
-  print (cities gTest1)
--}
-    -- print (isStronglyConnected gTest1)
-    -- print (isStronglyConnected gTest2)
-    -- print (isStronglyConnected gTest3)
-
-
-    -- print (travelSales gTest2)
-
-  --print (shortestPath gTest2 "0" "3")
-
-{-  
-  putStrLn "Testing gTest1:"
-  print (travelSales gTest1)
-
-  putStrLn "Testing gTest2:"
-  print (travelSales gTest2)
--}
-  putStrLn "Testing gTest1:"
-  print (shortestPath gTest1 "0" "8")
