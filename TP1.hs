@@ -194,13 +194,13 @@ isMaskFinal :: Mask -> Bool
 isMaskFinal = all (== 1)
 
 -- Solves the Traveling Salesman Problem recursively, updating the best path and distance
-solveTSP :: Matrix -> Mask -> Int -> [Int] -> [Int] -> Distance -> Distance -> ([Int], Distance)
-solveTSP matrix currMask currCity currPath bestPath currDist bestDist
-    | isMaskFinal currMask = updateBestPath currCity currPath currDist matrix bestPath bestDist
-    | otherwise = foldl (tryNeighbor matrix currMask currCity currPath currDist) (bestPath, bestDist) unvisitedNeighbors
+findOptimalPath :: Matrix -> Mask -> Int -> [Int] -> [Int] -> Distance -> Distance -> ([Int], Distance)
+findOptimalPath distanceMatrix visitedMask currentLocation currentTour bestTour currentCost bestCost
+    | isMaskFinal visitedMask = updateBestPath currentLocation currentTour currentCost distanceMatrix bestTour bestCost
+    | otherwise = foldl (exploreNeighbors distanceMatrix visitedMask currentLocation currentTour currentCost) (bestTour, bestCost) remainingCities
     where
-        returnToStart = head (matrix !! currCity)
-        unvisitedNeighbors = filter (\x -> getBit x currMask == 0) [0..length currMask - 1]
+        distanceToStart = head (distanceMatrix !! currentLocation)
+        remainingCities = filter (\city -> getBit city visitedMask == 0) [0..length visitedMask - 1]
 
 -- Update the best path if the current one is better
 updateBestPath :: Int -> [Int] -> Distance -> Matrix -> [Int] -> Distance -> ([Int], Distance)
@@ -212,12 +212,12 @@ updateBestPath currCity currPath currDist matrix bestPath bestDist
         returnToStart = head (matrix !! currCity)
 
 -- Try visiting a neighbor city and updating the best path and distance
-tryNeighbor :: Matrix -> Mask -> Int -> [Int] -> Distance -> ([Int], Distance) -> Int -> ([Int], Distance)
-tryNeighbor matrix currMask currCity currPath currDist (bestPath, bestDist) neighbor =
+exploreNeighbors :: Matrix -> Mask -> Int -> [Int] -> Distance -> ([Int], Distance) -> Int -> ([Int], Distance)
+exploreNeighbors matrix currMask currCity currPath currDist (bestPath, bestDist) neighbor =
     let nextMask = setBit neighbor currMask
         nextPath = currPath ++ [neighbor]
         nextDist = currDist + matrix !! currCity !! neighbor
-    in solveTSP matrix nextMask neighbor nextPath bestPath nextDist bestDist
+    in findOptimalPath matrix nextMask neighbor nextPath bestPath nextDist bestDist
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -240,7 +240,6 @@ tspShortestPath roadMap = if null allCycles then [] else minimumBy compareDist a
     allCycles = tspPaths roadMap start (filter (/= start) allCities) [(start, 0)]
     compareDist p1 p2 = compare (totalDistPath p1) (totalDistPath p2)
 
-
 -- Helper function to find the minimum by a specific criterion
 minimumBy :: (a -> a -> Ordering) -> [a] -> a
 minimumBy cmp (x:xs) = foldl (\acc y -> if cmp y acc == LT then y else acc) x xs
@@ -252,7 +251,7 @@ minimumBy cmp (x:xs) = foldl (\acc y -> if cmp y acc == LT then y else acc) x xs
 travelSales :: RoadMap -> Path
 travelSales roadmap
     | isStronglyConnected roadmap = if length cities_ > 8 
-                                    then  convertPath (fst (solveTSP matrix startMask startCity [0] [] 0 1000000)) citiesDict 
+                                    then  convertPath (fst (findOptimalPath matrix startMask startCity [0] [] 0 1000000)) citiesDict 
                                     else map fst (tspShortestPath roadmap)
     | otherwise              = []       -- If graph is not connected, return empty path.
     where
