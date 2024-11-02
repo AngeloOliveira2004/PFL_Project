@@ -1,9 +1,6 @@
 import qualified Data.List
 import qualified Data.Array
 import qualified Data.Bits
-import Data.Time.Clock (getCurrentTime, diffUTCTime, UTCTime)
-import Control.Monad (forM_)
-import Data.Time.Clock
 -- PFL 2024/2025 Practical assignment 1
 
 -- Uncomment the some/all of the first three lines to import the modules, do not change the code of these lines.
@@ -141,48 +138,54 @@ shortestPath roadMap source destination =
 --4.9 - TSP
 
 -- Stores a pair (id, city) to map a id to the corresponding city
+-- Type definitions
 type Dict = [(Int, City)]
-
--- Represents the Road Map as a matrix
 type Matrix = [[Int]]
+type Mask = [Int]
+
+-- Constants
+inf :: Int
+inf = 1000000000000  -- or any large number you choose
 
 -- Maps a list of cities to unique integer IDs, starting from a given ID
-mapCities :: [City] -> Int -> Dict
-mapCities cities startId = zip [startId..] cities
+initializeDict :: [City] -> Int -> Dict
+initializeDict cities startId = zip [startId..] cities
 
 -- Retrieves the city name corresponding to a given integer ID from the dictionary
 getCityFromDict :: Dict -> Int -> City
-getCityFromDict dict id = case lookup id dict of
-    Just city -> city
-    Nothing -> ""
+getCityFromDict dict cityId = maybe "" id (lookup cityId dict)
 
 -- Converts a list of city IDs to a list of city names using a dictionary
 convertPath :: [Int] -> Dict -> Path
-convertPath [] _ = []
-convertPath (cityID:rest) citiesDict = getCityFromDict citiesDict cityID : convertPath rest citiesDict
+convertPath ids citiesDict = map (getCityFromDict citiesDict) ids
 
--- Creates initial matrix of distances with 1000000 if there is no edge or with the edge weight otherwise. The matrix is symmetric
-initMatrix :: Int -> Dict -> RoadMap -> Matrix
-initMatrix size dict roadMap = 
-    [[ if dist == -1 then 1000000 else dist
-        | col <- [0..size - 1], let dist = snd (areAdjacentAux roadMap (getCityFromDict dict line) (getCityFromDict dict col))
-    ] | line <- [0..size - 1]]
+-- Retrieves the distance between two cities from the road map
+getDistanceBetweenCities :: RoadMap -> City -> City -> Distance
+getDistanceBetweenCities roadMap city1 city2 =
+    maybe inf snd (findDistance roadMap city1 city2)
 
-areAdjacentAux :: RoadMap -> City -> City -> (Bool, Int)
-areAdjacentAux rm city1 city2 = case lookup (city1, city2) distances of
-    Just d  -> (True, d)
-    Nothing -> (False, -1)
-    where
-    distances = [((c1, c2), d) | (c1, c2, d) <- rm] ++ [((c2, c1), d) | (c1, c2, d) <- rm]
+-- Finds the distance between two cities, searching both directions
+findDistance :: RoadMap -> City -> City -> Maybe (City, Distance)
+findDistance roadMap city1 city2 = case distance roadMap city1 city2 of
+    Just dist -> Just (city2, dist)
+    Nothing -> case distance roadMap city2 city1 of
+        Just dist -> Just (city2, dist)
+        Nothing -> Nothing
 
--- To represent mask, [0,1,0,1] is equivelent to 0b0101
-type Mask = [Int]
+-- Initializes the distance matrix with appropriate values
+initializeMatrix :: Int -> Dict -> RoadMap -> Matrix
+initializeMatrix size dict roadMap = 
+    [ [ getDistanceBetweenCities roadMap (getCityFromDict dict row) (getCityFromDict dict col)
+      | col <- [0..size - 1]
+      ]
+    | row <- [0..size - 1]
+    ]
 
--- Gets the bit (1 or 0) at a specific index from a mask (list of integers)
+-- Gets the bit (1 or 0) at a specific index from a mask
 getBit :: Int -> Mask -> Int
 getBit index mask = mask !! index
 
--- Sets the bit at a specific index in a mask to 1 (It means city at index is marked visited)
+-- Sets the bit at a specific index in a mask to 1
 setBit :: Int -> Mask -> Mask
 setBit index mask = take index mask ++ [1] ++ drop (index + 1) mask
 
@@ -190,42 +193,33 @@ setBit index mask = take index mask ++ [1] ++ drop (index + 1) mask
 isMaskFinal :: Mask -> Bool
 isMaskFinal = all (== 1)
 
--- Solves the Traveling Salesman Problem using a dynamic programming approach with bit masking.
--- Returns the best path (a list of city indices) and the minimum distance required to visit all cities and return to the start.
-travelSales :: RoadMap -> Path
-travelSales roadmap
-    | isStronglyConnected roadmap = convertPath (fst (solveTSP matrix startMask startCity [0] [] 0 1000000)) citiesDict
-    | otherwise              = []       -- If graph is not connected, return empty path.
-    where
-        cities_ = cities roadmap
-        size = length cities_
-        citiesDict = mapCities cities_ 0
-        matrix = initMatrix size citiesDict roadmap
-        startCity = 0
-        startMask = [ if i == 0 then 1 else 0 | i <- [0..size - 1]]
-
--- Recursively solves the Traveling Salesman Problem, updating the best path and distance.
--- Takes the distance matrix, current bitmask (visited cities), current city, current path, best path found so far,
--- current distance, and best distance, and returns the optimal path and minimum distance.
+-- Solves the Traveling Salesman Problem recursively, updating the best path and distance
 solveTSP :: Matrix -> Mask -> Int -> [Int] -> [Int] -> Distance -> Distance -> ([Int], Distance)
 solveTSP matrix currMask currCity currPath bestPath currDist bestDist
-    | isMaskFinal currMask = 
-        if returnToStart /= 1000000             -- If there is a path back to the start city
-        then if currDist + returnToStart < bestDist -- If the current path is shorter than the best path found so far
-             then (currPath ++ [0], currDist + returnToStart) -- Update the best path and distance
-             else (bestPath, bestDist) -- Otherwise, keep the best path and distance
-        else (bestPath, bestDist) -- If there is no path back to the start city, keep the best path and distance
-    | otherwise = foldl tryNeighbor (bestPath, bestDist) unvisitedNeighbors -- Try all unvisited neighbors and update the best path and distance
+    | isMaskFinal currMask = updateBestPath currCity currPath currDist matrix bestPath bestDist
+    | otherwise = foldl (tryNeighbor matrix currMask currCity currPath currDist) (bestPath, bestDist) unvisitedNeighbors
     where
-        returnToStart = matrix !! currCity !! 0 -- Distance from current city to start city
-        unvisitedNeighbors = [x | x <- [0..length currMask - 1], getBit x currMask == 0] -- Unvisited neighbors
-        tryNeighbor (accPath, accDist) neighbor =  -- Try a neighbor and update the best path and distance
-            solveTSP matrix (setBit neighbor currMask) neighbor -- Recursively call solveTSP with the neighbor as the current city
-                    (currPath ++ [neighbor]) accPath -- Update the current path and best path
-                    (currDist + matrix !! currCity !! neighbor) accDist -- Update the current distance and best distance
+        returnToStart = head (matrix !! currCity)
+        unvisitedNeighbors = filter (\x -> getBit x currMask == 0) [0..length currMask - 1]
 
+-- Update the best path if the current one is better
+updateBestPath :: Int -> [Int] -> Distance -> Matrix -> [Int] -> Distance -> ([Int], Distance)
+updateBestPath currCity currPath currDist matrix bestPath bestDist
+    | returnToStart /= inf && currDist + returnToStart < bestDist =
+        (currPath ++ [0], currDist + returnToStart)
+    | otherwise = (bestPath, bestDist)
+    where
+        returnToStart = head (matrix !! currCity)
 
--------------------------------------------------------------------------------------------------------------------------
+-- Try visiting a neighbor city and updating the best path and distance
+tryNeighbor :: Matrix -> Mask -> Int -> [Int] -> Distance -> ([Int], Distance) -> Int -> ([Int], Distance)
+tryNeighbor matrix currMask currCity currPath currDist (bestPath, bestDist) neighbor =
+    let nextMask = setBit neighbor currMask
+        nextPath = currPath ++ [neighbor]
+        nextDist = currDist + matrix !! currCity !! neighbor
+    in solveTSP matrix nextMask neighbor nextPath bestPath nextDist bestDist
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 -- Recursive DFS to collect all paths visiting each city exactly once, returning to the start
 tspPaths :: RoadMap -> City -> [City] -> PathDistances -> [PathDistances]
@@ -245,16 +239,30 @@ tspShortestPath roadMap = if null allCycles then [] else minimumBy compareDist a
     start = head allCities
     allCycles = tspPaths roadMap start (filter (/= start) allCities) [(start, 0)]
     compareDist p1 p2 = compare (totalDistPath p1) (totalDistPath p2)
-    
+
 
 -- Helper function to find the minimum by a specific criterion
 minimumBy :: (a -> a -> Ordering) -> [a] -> a
-minimumBy _ [] = error "minimumBy: empty list"
 minimumBy cmp (x:xs) = foldl (\acc y -> if cmp y acc == LT then y else acc) x xs
 
-roadMap :: RoadMap
-roadMap = [("A", "B", 10), ("A", "C", 15), ("A", "D", 20), 
-           ("B", "C", 35), ("B", "D", 25), ("C", "D", 30)]
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- Solves the Traveling Salesman Problem using a dynamic programming approach with bit masking.
+-- Returns the best path (a list of city indices) and the minimum distance required to visit all cities and return to the start.
+travelSales :: RoadMap -> Path
+travelSales roadmap
+    | isStronglyConnected roadmap = if length cities_ > 8 
+                                    then  convertPath (fst (solveTSP matrix startMask startCity [0] [] 0 1000000)) citiesDict 
+                                    else map fst (tspShortestPath roadmap)
+    | otherwise              = []       -- If graph is not connected, return empty path.
+    where
+        cities_ = cities roadmap
+        size = length cities_
+        citiesDict = initializeDict cities_ 0
+        matrix = initializeMatrix size citiesDict roadmap
+        startCity = 0
+        startMask = [if i == 0 then 1 else 0 | i <- [0..size - 1]]
+
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -278,41 +286,94 @@ gTest4 = [("A", "B", 10), ("A", "C", 15), ("A", "D", 20), ("A", "E", 25), ("A", 
           ("D", "E", 70), ("D", "F", 75),
           ("E", "F", 80)]
 
--- Time wrapper for travelSales
-timeTravelSales :: RoadMap -> IO (Path, NominalDiffTime)
-timeTravelSales roadmap = do
-    start <- getCurrentTime
-    let result = travelSales roadmap
-    end <- getCurrentTime
-    let duration = diffUTCTime end start
-    return (result, duration)
+roadMap :: RoadMap
+roadMap = [("City1", "City2", 10), ("City1", "City3", 15), ("City1", "City4", 20),
+           ("City1", "City5", 10), ("City1", "City6", 25), ("City1", "City7", 30),
+           ("City1", "City8", 35), ("City1", "City9", 40), ("City1", "City10", 45),
+            ("City1", "City11", 50), ("City1", "City12", 55), ("City1", "City13", 60),
+            ("City1", "City14", 65), ("City1", "City15", 70),
 
--- Timing wrapper for tspShortestPath
-timeTspShortestPath :: RoadMap -> IO (PathDistances, NominalDiffTime)
-timeTspShortestPath roadmap = do
-    start <- getCurrentTime
-    let result = tspShortestPath roadmap
-    end <- getCurrentTime
-    let duration = diffUTCTime end start
-    return (result, duration)
+            ("City2", "City3", 5), ("City2", "City4", 10), ("City2", "City5", 20),
+            ("City2", "City6", 15), ("City2", "City7", 25), ("City2", "City8", 30),
+            ("City2", "City9", 35), ("City2", "City10", 40), ("City2", "City11", 45),
+            ("City2", "City12", 50), ("City2", "City13", 55), ("City2", "City14", 60),
+            ("City2", "City15", 65),
 
--- Function to accumulate total time for multiple test cases
-totalTime :: [IO (a, NominalDiffTime)] -> IO NominalDiffTime
-totalTime tests = do
-    times <- mapM (fmap snd) tests
-    return (sum times)
+            ("City3", "City4", 10), ("City3", "City5", 15), ("City3", "City6", 20),
+            ("City3", "City7", 10), ("City3", "City8", 25), ("City3", "City9", 30),
+            ("City3", "City10", 35), ("City3", "City11", 40), ("City3", "City12", 45),
+            ("City3", "City13", 50), ("City3", "City14", 55), ("City3", "City15", 60),
 
--- Test all functions with all test cases
+            ("City4", "City5", 5), ("City4", "City6", 15), ("City4", "City7", 10),
+            ("City4", "City8", 20), ("City4", "City9", 25), ("City4", "City10", 30),
+            ("City4", "City11", 35), ("City4", "City12", 40), ("City4", "City13", 45),
+            ("City4", "City14", 50), ("City4", "City15", 55),
+
+            ("City5", "City6", 10), ("City5", "City7", 20), ("City5", "City8", 15),
+            ("City5", "City9", 25), ("City5", "City10", 20), ("City5", "City11", 30),
+            ("City5", "City12", 35), ("City5", "City13", 40), ("City5", "City14", 45),
+            ("City5", "City15", 50),
+
+            ("City6", "City7", 5), ("City6", "City8", 10), ("City6", "City9", 20),
+            ("City6", "City10", 25), ("City6", "City11", 30), ("City6", "City12", 25),
+            ("City6", "City13", 35), ("City6", "City14", 40), ("City6", "City15", 45),
+
+            ("City7", "City8", 15), ("City7", "City9", 10), ("City7", "City10", 20),
+            ("City7", "City11", 25), ("City7", "City12", 30), ("City7", "City13", 35),
+            ("City7", "City14", 30), ("City7", "City15", 40),
+
+            ("City8", "City9", 5), ("City8", "City10", 10), ("City8", "City11", 15),
+            ("City8", "City12", 20), ("City8", "City13", 25), ("City8", "City14", 30),
+            ("City8", "City15", 35),
+
+            ("City9", "City10", 10), ("City9", "City11", 15), ("City9", "City12", 20),
+            ("City9", "City13", 25), ("City9", "City14", 20), ("City9", "City15", 30),
+
+            ("City10", "City11", 5), ("City10", "City12", 10), ("City10", "City13", 15),
+            ("City10", "City14", 20), ("City10", "City15", 25),
+
+            ("City11", "City12", 15), ("City11", "City13", 10), ("City11", "City14", 20),
+            ("City11", "City15", 30),
+
+            ("City12", "City13", 5), ("City12", "City14", 10), ("City12", "City15", 15),
+
+            ("City13", "City14", 20), ("City13", "City15", 25),
+
+            ("City14", "City15", 10)]
+
+roadMap' :: RoadMap
+roadMap' = [
+    ("City1", "City2", 29), ("City1", "City3", 20), ("City1", "City4", 21),
+    ("City1", "City5", 16), ("City1", "City6", 31), ("City1", "City7", 100),
+    ("City1", "City8", 12), ("City1", "City9", 4), ("City1", "City10", 31),
+
+    ("City2", "City3", 15), ("City2", "City4", 29), ("City2", "City5", 28),
+    ("City2", "City6", 40), ("City2", "City7", 72), ("City2", "City8", 21),
+    ("City2", "City9", 29), ("City2", "City10", 41),
+
+    ("City3", "City4", 17), ("City3", "City5", 27), ("City3", "City6", 42),
+    ("City3", "City7", 58), ("City3", "City8", 25), ("City3", "City9", 23),
+    ("City3", "City10", 37),
+
+    ("City4", "City5", 30), ("City4", "City6", 55), ("City4", "City7", 65),
+    ("City4", "City8", 19), ("City4", "City9", 34), ("City4", "City10", 26),
+
+    ("City5", "City6", 40), ("City5", "City7", 60), ("City5", "City8", 22),
+    ("City5", "City9", 31), ("City5", "City10", 25),
+
+    ("City6", "City7", 10), ("City6", "City8", 20), ("City6", "City9", 30),
+    ("City6", "City10", 15),
+
+    ("City7", "City8", 80), ("City7", "City9", 70), ("City7", "City10", 50),
+
+    ("City8", "City9", 30), ("City8", "City10", 25),
+
+    ("City9", "City10", 35)]
+
+
 main :: IO ()
 main = do
-    putStrLn "Calculating total time for travelSales and tspShortestPath functions on all test cases..."
+    return()
 
-    let travelSalesTests = [timeTravelSales gTest1, timeTravelSales gTest2, timeTravelSales gTest3, timeTravelSales gTest4]
-    totalTravelSalesTime <- totalTime travelSalesTests
-
-    let tspShortestPathTests = [timeTspShortestPath gTest1, timeTspShortestPath gTest2, timeTspShortestPath gTest3, timeTspShortestPath gTest4]
-    totalTspShortestPathTime <- totalTime tspShortestPathTests
-
-    putStrLn $ "\nTotal time for travelSales: " ++ show totalTravelSalesTime
-    putStrLn $ "Total time for tspShortestPath: " ++ show totalTspShortestPathTime
-
+--call travelSales with BF when n! < 2^n * n^2
+--n = 7
