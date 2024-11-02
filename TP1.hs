@@ -272,8 +272,8 @@ solveTSP matrix currMask currCity currPath bestPath currDist bestDist
 
 -- 4.8 Dijkstra's algorithm
 
--- type DistanceCityTuple = (City, Distance) -- Represents a city and the distance to it
--- type PathDistances = [DistanceCityTuple] -- Represents a path with with a city root and the distance to it
+type DistanceCityTuple = (City, Distance) -- Represents a city and the distance to it
+type PathDistances = [DistanceCityTuple] -- Represents a path with with a city root and the distance to it
 
 getAllCitiesExceptOne :: [City] -> City -> [City]
 getAllCitiesExceptOne allCities city = filter (/=city) allCities
