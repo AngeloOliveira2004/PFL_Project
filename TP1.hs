@@ -275,6 +275,7 @@ dijkstra rm cityDistances heap cityParentNodes
             (updatedDistances, newHeap, updatedPredecessors) = relaxNeighbors currentCity unvisitedNeighbors cityDistances updatedHeap cityParentNodes
         in dijkstra rm updatedDistances newHeap updatedPredecessors -- Recursively call dijkstra with the updated distances, heap, and predecessors
 
+
 filterUnvisitedNeighbors :: RoadMap -> MinHeap -> CityParentNodes -> City -> [(City, Distance)]
 filterUnvisitedNeighbors rm heap cityParentNodes currentCity =
     filter (\(city, _) -> not (cityHasPredecessors cityParentNodes city && getCityDistanceFromHeap heap city == infinite)) (adjacent rm currentCity)
