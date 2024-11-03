@@ -23,7 +23,7 @@ José Costa - up202207871@up.pt
 
 ### ShortestPath Explanation:
 
-The shortestPath function implements Dijkstra's algorithm to find the shortest paths from a source city to a target city within a road map represented as a graph.
+The `shortestPath` function implements Dijkstra's algorithm to find the shortest paths from a source city to a target city within a road map represented as a graph.
 
 ##### Overview of the Implementation
 
