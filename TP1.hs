@@ -139,25 +139,25 @@ shortestPath roadMap source destination =
 
 -- Stores a pair (id, city) to map a id to the corresponding city
 -- Type definitions
-type Dict = [(Int, City)]
+type CitiesToIDs = [(Int, City)]
 type Matrix = [[Int]]
-type Mask = [Int]
+type VisitedArray = [Int] --An array to keep track visited cities, 1 if visited, 0 if not
 
 -- Constants
 inf :: Int
 inf = 1000000000000  -- or any large number you choose
 
 -- Maps a list of cities to unique integer IDs, starting from a given ID
-initializeDict :: [City] -> Int -> Dict
-initializeDict cities startId = zip [startId..] cities
+initializeCitiesToIDs :: [City] -> Int -> CitiesToIDs
+initializeCitiesToIDs cities startId = zip [startId..] cities
 
 -- Retrieves the city name corresponding to a given integer ID from the dictionary
-getCityFromDict :: Dict -> Int -> City
-getCityFromDict dict cityId = maybe "" id (lookup cityId dict)
+getCityFromCitiesToIDs :: CitiesToIDs -> Int -> City
+getCityFromCitiesToIDs citiesToIds cityId = maybe "" id (lookup cityId citiesToIds)
 
 -- Converts a list of city IDs to a list of city names using a dictionary
-convertPath :: [Int] -> Dict -> Path
-convertPath ids citiesDict = map (getCityFromDict citiesDict) ids
+convertPath :: [Int] -> CitiesToIDs -> Path
+convertPath ids citiesToIds = map (getCityFromCitiesToIDs citiesToIds) ids
 
 -- Retrieves the distance between two cities from the road map
 getDistanceBetweenCities :: RoadMap -> City -> City -> Distance
@@ -173,34 +173,25 @@ findDistance roadMap city1 city2 = case distance roadMap city1 city2 of
         Nothing -> Nothing
 
 -- Initializes the distance matrix with appropriate values
-initializeMatrix :: Int -> Dict -> RoadMap -> Matrix
-initializeMatrix size dict roadMap = 
-    [ [ getDistanceBetweenCities roadMap (getCityFromDict dict row) (getCityFromDict dict col)
+initializeMatrix :: Int -> CitiesToIDs -> RoadMap -> Matrix
+initializeMatrix size citiesIds roadMap = 
+    [ [ getDistanceBetweenCities roadMap (getCityFromCitiesToIDs citiesIds row) (getCityFromCitiesToIDs citiesIds col)
       | col <- [0..size - 1]
       ]
     | row <- [0..size - 1]
     ]
 
 -- Gets the bit (1 or 0) at a specific index from a mask
-getBit :: Int -> Mask -> Int
-getBit index mask = mask !! index
+getVisited :: Int -> VisitedArray -> Int
+getVisited index visitedArray = visitedArray !! index
 
 -- Sets the bit at a specific index in a mask to 1
-setBit :: Int -> Mask -> Mask
-setBit index mask = take index mask ++ [1] ++ drop (index + 1) mask
+setVisited :: Int -> VisitedArray -> VisitedArray
+setVisited index visitedArray = take index visitedArray ++ [1] ++ drop (index + 1) visitedArray
 
 -- Checks if all bits in the mask are set to 1 (final state, everything visited)
-isMaskFinal :: Mask -> Bool
-isMaskFinal = all (== 1)
-
--- Solves the Traveling Salesman Problem recursively, updating the best path and distance
-findOptimalPath :: Matrix -> Mask -> Int -> [Int] -> [Int] -> Distance -> Distance -> ([Int], Distance)
-findOptimalPath distanceMatrix visitedMask currentLocation currentTour bestTour currentCost bestCost
-    | isMaskFinal visitedMask = updateBestPath currentLocation currentTour currentCost distanceMatrix bestTour bestCost
-    | otherwise = foldl (exploreNeighbors distanceMatrix visitedMask currentLocation currentTour currentCost) (bestTour, bestCost) remainingCities
-    where
-        distanceToStart = head (distanceMatrix !! currentLocation)
-        remainingCities = filter (\city -> getBit city visitedMask == 0) [0..length visitedMask - 1]
+areAllVisited :: VisitedArray -> Bool
+areAllVisited = all (== 1)
 
 -- Update the best path if the current one is better
 updateBestPath :: Int -> [Int] -> Distance -> Matrix -> [Int] -> Distance -> ([Int], Distance)
@@ -212,12 +203,22 @@ updateBestPath currCity currPath currDist matrix bestPath bestDist
         returnToStart = head (matrix !! currCity)
 
 -- Try visiting a neighbor city and updating the best path and distance
-exploreNeighbors :: Matrix -> Mask -> Int -> [Int] -> Distance -> ([Int], Distance) -> Int -> ([Int], Distance)
+exploreNeighbors :: Matrix -> VisitedArray -> Int -> [Int] -> Distance -> ([Int], Distance) -> Int -> ([Int], Distance)
 exploreNeighbors matrix currMask currCity currPath currDist (bestPath, bestDist) neighbor =
-    let nextMask = setBit neighbor currMask
+    let nextMask = setVisited neighbor currMask
         nextPath = currPath ++ [neighbor]
         nextDist = currDist + matrix !! currCity !! neighbor
     in findOptimalPath matrix nextMask neighbor nextPath bestPath nextDist bestDist
+
+
+-- Solves the Traveling Salesman Problem recursively, updating the best path and distance
+findOptimalPath :: Matrix -> VisitedArray -> Int -> [Int] -> [Int] -> Distance -> Distance -> ([Int], Distance)
+findOptimalPath distanceMatrix visitedArray currentLocation currentTour bestTour currentCost bestCost
+    | areAllVisited visitedArray = updateBestPath currentLocation currentTour currentCost distanceMatrix bestTour bestCost
+    | otherwise = foldl (exploreNeighbors distanceMatrix visitedArray currentLocation currentTour currentCost) (bestTour, bestCost) remainingCities
+    where
+        distanceToStart = head (distanceMatrix !! currentLocation)
+        remainingCities = filter (\city -> getVisited city visitedArray == 0) [0..length visitedArray - 1]
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -251,14 +252,14 @@ minimumBy cmp (x:xs) = foldl (\acc y -> if cmp y acc == LT then y else acc) x xs
 travelSales :: RoadMap -> Path
 travelSales roadmap
     | isStronglyConnected roadmap = if length cities_ > 8 
-                                    then  convertPath (fst (findOptimalPath matrix startMask startCity [0] [] 0 1000000)) citiesDict 
+                                    then  convertPath (fst (findOptimalPath matrix startMask startCity [0] [] 0 1000000)) citiesToIds 
                                     else map fst (tspShortestPath roadmap)
     | otherwise              = []       -- If graph is not connected, return empty path.
     where
         cities_ = cities roadmap
         size = length cities_
-        citiesDict = initializeDict cities_ 0
-        matrix = initializeMatrix size citiesDict roadmap
+        citiesToIds = initializeCitiesToIDs cities_ 0
+        matrix = initializeMatrix size citiesToIds roadmap
         startCity = 0
         startMask = [if i == 0 then 1 else 0 | i <- [0..size - 1]]
 
