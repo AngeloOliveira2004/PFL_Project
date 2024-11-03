@@ -11,18 +11,48 @@ type Distance = Int
 
 type RoadMap = [(City,City,Distance)]
 
--- Remove duplicates from a list
-removeDup :: Eq a => [a] -> [a]
-removeDup [] = [] -- If the list is empty, return an empty list
-removeDup (x:xs) = x : removeDup (filter (/= x) xs) -- Add the first element to the list and call removeDup recursively with the rest of the list, filtering out the first element
+-- | A constant representing a large "infinity" value used to denote no connection between cities.
+--
+-- ### Definition:
+-- * `infinity` is set to a large integer value, `1000000000000`.
+--
+-- ### Usage:
+-- * Used as a placeholder for "infinite" distance where cities are not directly connected in the matrix.
+infinite :: Int
+infinite = 1000000000000  -- or any large number you choose
 
 --4.1 - Return all the cities in the road map
+
+
+-- | Retrieves all unique cities in the given road map.
+--
+-- ### Arguments:
+-- * `roadMap` - A `RoadMap`, which is a list of tuples representing connections between cities with distances.
+--
+-- ### Returns:
+-- * A list of unique `City` values present in the road map.
+--
+-- ### Logic:
+-- * Extracts both cities from each connection tuple in the road map, collects them into a list, and removes duplicates using `Data.List.nub`.
 cities :: RoadMap -> [City]
-cities roadMap = removeDup [city | (city1 , city2 , _ ) <- roadMap , city <- [city1 , city2]] -- Add all the cities to a list and remove duplicates
+cities roadMap = Data.List.nub [city | (city1 , city2 , _ ) <- roadMap , city <- [city1 , city2]] -- Add all the cities to a list and remove duplicates
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 --4.2 - Check if two cities are adjacent
 
+
+-- | Determines if two cities are directly connected in the road map.
+--
+-- ### Arguments:
+-- * `roadMap` - A `RoadMap`, which is a list of tuples representing connections between cities with distances.
+-- * `city1`, `city2` - The two `City` values to check for adjacency.
+--
+-- ### Returns:
+-- * `True` if there is a direct connection between `city1` and `city2`.
+-- * `False` otherwise.
+--
+-- ### Logic:
+-- * Checks if there is any connection tuple in the road map where `city1` and `city2` appear together, either as `(city1, city2)` or `(city2, city1)`.
 areAdjacent :: RoadMap -> City -> City -> Bool
 areAdjacent roadMap city1 city2 =
     any (\(c1 , c2 , _) -> c1 == city1 && c2 == city2 || c1 == city2 && c2 == city1) roadMap -- Verifies if there is a tuple in the roadMap that has the two cities as the first and second element
@@ -31,6 +61,22 @@ areAdjacent roadMap city1 city2 =
 
 --4.3 - Return the distance between two cities
 
+
+-- | Returns the distance between two cities if they are connected.
+--
+-- ### Arguments:
+-- * `roadMap` - A `RoadMap`, which is a list of tuples representing connections between cities with distances.
+-- * `city1`, `city2` - The two `City` values between which the distance is to be calculated.
+--
+-- ### Returns:
+-- * `Just Distance` if there is a direct connection between `city1` and `city2`.
+-- * `Nothing` if the cities are not connected, or if either city is empty.
+-- * `Just 0` if the cities are the same.
+--
+-- ### Logic:
+-- * Handles base cases where `city1` or `city2` are empty, returning `Nothing`.
+-- * If `city1` is the same as `city2`, returns a distance of 0.
+-- * If neither base case applies, checks the road map for a direct connection and returns the corresponding distance if found.
 distance :: RoadMap -> City -> City -> Maybe Distance
 distance roadMap city1 city2
         | null city1 = Nothing -- If the first city is null , return Nothing
@@ -44,6 +90,20 @@ distance roadMap city1 city2
 
  --4.4 - Return the list of cities adjacent to a given city
 
+
+-- | Retrieves a list of cities directly connected to a specified city, along with their respective distances.
+--
+-- ### Arguments:
+-- * `roadMap` - A `RoadMap`, which is a list of tuples representing connections between cities with distances.
+-- * `city` - The `City` for which to find adjacent cities.
+--
+-- ### Returns:
+-- * A list of tuples `(City, Distance)`, where each tuple represents an adjacent city and the distance to it.
+-- * Returns an empty list if the city is empty.
+--
+-- ### Logic:
+-- * Filters the road map for connections involving the specified city.
+-- * For each matching connection, includes the opposite city and the distance in the result list.
 adjacent :: RoadMap -> City -> [(City,Distance)]
 adjacent roadMap city
         | null city = [] -- If the city is null , return an empty list
@@ -52,6 +112,22 @@ adjacent roadMap city
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 --4.5 - Return the distance of a path
+
+
+-- | Calculates the total distance of a given path in the road map.
+--
+-- ### Arguments:
+-- * `roadMap` - A `RoadMap` containing cities and the distances between them.
+-- * `path` - A `Path`, represented as a list of `City` values, whose total distance is to be calculated.
+--
+-- ### Returns:
+-- * `Maybe Distance`:
+--     - `Just distance` if all cities in the path are connected, representing the total distance.
+--     - `Nothing` if there is a missing connection between any two consecutive cities in the path.
+--
+-- ### Logic:
+-- * Starts with a base case of 0 distance if the path is empty or contains only one city.
+-- * Recursively calculates the distance between each pair of cities in the path, accumulating the total if all connections exist, otherwise returns `Nothing`.
 pathDistance :: RoadMap -> Path -> Maybe Distance
 pathDistance roadMap [] = Just 0 -- No cities in the path , so the distance is 0
 pathDistance roadMap [_] = Just 0 -- Only one city in the path , so the distance is 0
@@ -66,6 +142,17 @@ pathDistance roadMap (c1:c2:xs) =
 
 --4.6 - Return the names of the cities with the highest number of roads connecting to them
 
+-- | Finds the cities with the highest number of connecting roads.
+--
+-- ### Arguments:
+-- * `roadMap` - A `RoadMap` representing the network of cities and roads.
+--
+-- ### Returns:
+-- * A list of `City` values that have the most roads connected to them.
+--
+-- ### Logic:
+-- * Counts the number of roads (connections) for each city in the road map.
+-- * Identifies the maximum number of connections and returns the cities that have this highest count.
 rome :: RoadMap -> [City]
 rome roadMap = let
     citiesVar = cities roadMap -- All the cities in the roadMap
@@ -80,6 +167,19 @@ rome roadMap = let
 
 --4.7 - Check if the road map is strongly connected
 
+
+-- | Checks if a road map is strongly connected.
+--
+-- ### Arguments:
+-- * `roadMap` - A `RoadMap` containing cities and roads.
+--
+-- ### Returns:
+-- * `True` if all cities in the road map are reachable from any starting city.
+-- * `False` otherwise.
+--
+-- ### Logic:
+-- * Uses Depth-First Search (DFS) starting from an arbitrary city and visits all reachable cities.
+-- * Compares the length of the visited cities with the total number of cities to determine strong connectivity.
 isStronglyConnected :: RoadMap -> Bool
 isStronglyConnected roadMap = let
     citiesVar = cities roadMap -- Fetches all the cities in the roadMap
@@ -87,6 +187,20 @@ isStronglyConnected roadMap = let
     in
         length (dfs roadMap startCity []) == length citiesVar -- For all the cities in the roadMap , checks if the length of the list of visited cities is equal to the length of the list of all the cities in the roadMap
 
+
+-- | Performs a Depth-First Search (DFS) on the road map from a specified starting city.
+--
+-- ### Arguments:
+-- * `roadMap` - A `RoadMap` representing the network of cities and roads.
+-- * `city` - The starting `City` for the DFS traversal.
+-- * `visited` - A list of cities that have already been visited in the traversal.
+--
+-- ### Returns:
+-- * A list of `City` values representing all cities reachable from the starting city, including the visited ones.
+--
+-- ### Logic:
+-- * If a city has already been visited, returns the current visited list.
+-- * Otherwise, recursively visits all adjacent cities not yet visited, ensuring a complete traversal of all connected cities.
 dfs :: RoadMap -> City -> [City] -> [City]
 dfs roadMap city visited
     | city `elem` visited = visited -- If the city is already visited , return the list of visited cities
@@ -102,35 +216,433 @@ dfs roadMap city visited
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
---4.8 - Shortest path between two cities
+-- 4.8 Dijkstra's algorithm
 
-type DistanceCityTuple = (City, Distance) -- Represents a city and the distance to it
-type PathDistances = [DistanceCityTuple] -- Represents a path with with a city root and the distance to it
 
--- Finds the distance between two adjacent cities in the road map
-adjacentCityDistances :: RoadMap -> City -> [DistanceCityTuple]
-adjacentCityDistances roadMap city = [(city2, dist) | (city1, city2, dist) <- roadMap, city1 == city] ++ [(city1, dist) | (city1, city2, dist) <- roadMap, city2 == city]
+-- | A type synonym representing a city and its associated distance.
+--
+-- ### Type Definition:
+-- * `DistanceCityTuple` is a tuple where:
+--     - The first element is a `City` (a unique identifier for the city).
+--     - The second element is a `Distance` (an integer or floating-point value indicating the distance to that city).
+--
+-- ### Usage:
+-- * Commonly used to represent a city's distance in data structures such as queues and distance tables in shortest path algorithms.
+type DistanceCityTuple = (City, Distance)
 
--- Recursive DFS to collect all paths with distances from source to destination
-allPathsWithDistances :: RoadMap -> City -> City -> PathDistances -> [PathDistances]
-allPathsWithDistances roadMap source destination visited
-    | source == destination = [visited ++ [(destination, 0)]]  -- Found a path
+-- | A type synonym for a path that records distances for each city.
+--
+-- ### Type Definition:
+-- * `PathDistances` is a list of `DistanceCityTuple` values, each representing a city and the distance from a starting point.
+--
+-- ### Usage:
+-- * Used to store paths in terms of cities and their distances, helping trace the distance along a path in algorithms like Dijkstra’s.
+type PathDistances = [DistanceCityTuple] 
+
+-- | A type synonym for a priority queue of cities sorted by their distances.
+--
+-- ### Type Definition:
+-- * `Queue` is a list of `DistanceCityTuple` values, where each element is a city and its distance.
+--
+-- ### Usage:
+-- * Represents a queue that prioritizes cities based on their shortest known distances. This type is essential in Dijkstra's algorithm for efficient distance-based ordering.
+type Queue = [DistanceCityTuple]
+
+-- | A type synonym for recording the shortest known distance to each city.
+--
+-- ### Type Definition:
+-- * `CityDistances` is a list of `DistanceCityTuple` values, where each element indicates a city and its current shortest known distance from the source.
+--
+-- ### Usage:
+-- * Used in shortest path algorithms to keep track of each city’s shortest distance from the start city.
+type CityDistances = [DistanceCityTuple]
+
+-- | A type synonym for recording the shortest known distance to each city.
+--
+-- ### Type Definition:
+-- * `CityDistances` is a list of `DistanceCityTuple` values, where each element indicates a city and its current shortest known distance from the source.
+--
+-- ### Usage:
+-- * Used in shortest path algorithms to keep track of each city’s shortest distance from the start city.
+type CityParentNodes = [(City,[City])]
+
+-- | Finds all the shortest paths from a source city to a target city using Dijkstra's algorithm.
+--
+-- ### Arguments:
+-- * `roadMap` - A `RoadMap` representing the network of cities and their connections.
+-- * `startCity` - The starting `City` from which shortest paths will be calculated.
+--
+-- ### Returns:
+-- * A list of `Path` values, each representing a shortest path from `startCity` to the target city.
+--
+-- ### Logic:
+-- * Sets up the initial distances, queue, and predecessors by calling `initializeDijkstra`.
+-- * Executes Dijkstra's algorithm to populate the `cityParentNodes` with all possible shortest paths.
+-- * Uses `getAllShortestPaths` to retrieve all shortest paths from `startCity` to the destination based on recorded predecessors.
+shortestPathDijkstra :: RoadMap -> City -> City -> [Path]
+shortestPathDijkstra roadMap startCity = getAllShortestPaths cityParentNodes
+    where
+        (initialDistances, initialQueue, initialPredecessors) = initializeDijkstra roadMap startCity
+        cityParentNodes = dijkstra roadMap initialQueue initialPredecessors initialDistances  
+
+-- | Sets up initial distances, Queue, and predecessors for Dijkstra's algorithm.
+--
+-- ### Arguments:
+-- * `rm` - The `RoadMap` representing the city network.
+-- * `startCity` - The starting `City` for the path search.
+--
+-- ### Returns:
+-- * A tuple `(CityDistances, Queue, CityParentNodes)` representing:
+--     - Initial distances for each city from the start city.
+--     - A Queue containing only the start city with a distance of 0.
+--     - An initial predecessors list where only the start city has no predecessors.
+--
+-- ### Logic:
+-- * Initializes distances with `infinite` for all cities except the `startCity`, which is set to 0.
+-- * Creates an initial queue with the `startCity` and initializes the predecessor list.
+initializeDijkstra :: RoadMap -> City -> (CityDistances, Queue, CityParentNodes)
+initializeDijkstra rm startCity =
+    let initialDistances = map (\city -> (city, if city == startCity then 0 else infinite)) (cities rm)
+        initialQueue = [(startCity, 0)]
+        initialPredecessors = [(startCity, [])]
+    in (initialDistances, initialQueue, initialPredecessors)
+
+-- | Wrapper function to get all shortest paths by backtracking from the end city to the start city.
+--
+-- ### Arguments:
+-- * `cityParentNodes` - A `CityParentNodes` list recording each city’s predecessors in the shortest path.
+-- * `endCity` - The target `City` to backtrack from.
+--
+-- ### Returns:
+-- * A list of `Path`s representing all shortest paths from the start city to `endCity`.
+--
+-- ### Logic:
+-- * Calls `findPathsFromCityParentNodes`, starting from `endCity` and backtracking through each predecessor.
+getAllShortestPaths :: CityParentNodes -> City -> [Path]
+getAllShortestPaths cityParentNodes endCity = findPathsFromCityParentNodes cityParentNodes endCity [endCity]
+
+
+-- | Recursively finds all possible paths from the target city to the source using the city predecessors.
+--
+-- ### Arguments:
+-- * `cityParentNodes` - A `CityParentNodes` list containing predecessor cities.
+-- * `targetCity` - The current `City` being examined.
+-- * `currPath` - The `Path` constructed so far, which grows as recursion proceeds.
+--
+-- ### Returns:
+-- * A list of all possible `Path`s that lead from the source to `targetCity`.
+--
+-- ### Logic:
+-- * Uses `getPredecessors` to retrieve predecessors of `targetCity` and recursively explores each predecessor.
+-- * If no predecessors exist, returns `currPath` as a completed path.
+findPathsFromCityParentNodes :: CityParentNodes -> City -> Path -> [Path]
+findPathsFromCityParentNodes cityParentNodes targetCity currPath =
+    case getPredecessors cityParentNodes targetCity of
+        [] -> [currPath]
+        preds -> concatMap (\pred -> findPathsFromCityParentNodes cityParentNodes pred (pred : currPath)) preds -- Recursively call findPathsFromCityParentNodes with the predecessor as the target city and the predecessor appended to the current path
+
+-- | The Dijkstra algorithm implementation to find the shortest path in a roadmap.
+--
+-- ### Arguments:
+-- * `roadMap` - The `RoadMap` representing the city network.
+-- * `queue` - The `Queue` of cities to explore, prioritized by distance.
+-- * `cityParentNodes` - A `CityParentNodes` list recording each city’s predecessors.
+-- * `cityDistances` - A `CityDistances` list tracking the minimum distance to each city from the start.
+--
+-- ### Returns:
+-- * A `CityParentNodes` list representing the predecessors of each city in the shortest paths.
+--
+-- ### Logic:
+-- * Extracts the city with the smallest distance from `queue`.
+-- * Filters unvisited neighbors, relaxes their distances, and recursively calls `dijkstra` with updated values.
+dijkstra :: RoadMap -> Queue -> CityParentNodes -> CityDistances -> CityParentNodes
+dijkstra roadMap queue cityParentNodes cityDistances 
+    | null queue = cityParentNodes -- If queue is empty, we’re done
     | otherwise =
-        let adjacentCities = adjacentCityDistances roadMap source in concat
-        [ allPathsWithDistances roadMap adj destination (visited ++ [(source, dist)])
-        | (adj, dist) <- adjacentCities, adj `notElem` map fst visited ]
+        let currentCity = extractMinCity queue
+            updatedQueue = deleteCityFromQueue queue currentCity
+            unvisitedNeighbors = filterUnvisitedNeighbors roadMap updatedQueue cityParentNodes currentCity
+            (updatedDistances, newQueue, updatedPredecessors) = relaxNeighbors currentCity unvisitedNeighbors cityDistances updatedQueue cityParentNodes
+        in dijkstra roadMap newQueue updatedPredecessors updatedDistances -- Recursively call dijkstra with the updated distances, queue, and predecessors
 
--- Calculate the total distance of a path
-totalDistPath :: PathDistances -> Distance
-totalDistPath = sum . map snd
+        -- | Filters out unvisited neighboring cities of the current city.
+--
+-- ### Arguments:
+-- * `rm` - The `RoadMap` of all cities.
+-- * `queue` - The `Queue` tracking cities yet to be explored.
+-- * `cityParentNodes` - A `CityParentNodes` list of each city’s predecessors.
+-- * `currentCity` - The city whose neighbors are being examined.
+--
+-- ### Returns:
+-- * A list of `(City, Distance)` pairs representing unvisited neighbors of `currentCity`.
+--
+-- ### Logic:
+-- * Uses `adjacent` to get neighboring cities of `currentCity`.
+-- * Filters out cities that already have a predecessor and whose distance remains `infinite`.
+filterUnvisitedNeighbors :: RoadMap -> Queue -> CityParentNodes -> City -> [(City, Distance)]
+filterUnvisitedNeighbors rm queue cityParentNodes currentCity =
+    filter (\(city, _) -> not (cityHasPredecessors cityParentNodes city && getCityDistanceFromQueue queue city == infinite)) (adjacent rm currentCity)
 
--- Find the shortest path(s) between source and destination
+
+-- | Relaxes the distances for all neighbors of the current city.
+--
+-- ### Arguments:
+-- * `currentCity` - The city being processed.
+-- * `neighbors` - A list of neighboring cities with their edge weights.
+-- * `cityDistances` - The list of current minimum distances to each city.
+-- * `queue` - The `Queue` tracking cities yet to be explored.
+-- * `cityParentNodes` - A `CityParentNodes` list recording each city’s predecessors.
+--
+-- ### Returns:
+-- * Updated `CityDistances`, `Queue`, and `CityParentNodes` reflecting any relaxed paths.
+--
+-- ### Logic:
+-- * Uses `foldl` to apply `relaxNeighbor` on each neighbor, relaxing distances and updating predecessors as needed.
+relaxNeighbors :: City -> [(City, Distance)] -> CityDistances -> Queue -> CityParentNodes -> (CityDistances, Queue, CityParentNodes)
+relaxNeighbors currentCity neighbors cityDistances queue cityParentNodes =
+    foldl (\(distancesAcc, queueAcc, predecessorsAcc) (neighbor, edgeW) ->
+               relaxNeighbor currentCity neighbor edgeW distancesAcc queueAcc predecessorsAcc
+           ) (cityDistances, queue, cityParentNodes) neighbors
+
+-- | Relaxes the distance to a neighboring city if a shorter path is found.
+--
+-- ### Arguments:
+-- * `currentCity` - The city being processed.
+-- * `neighbor` - The neighboring city.
+-- * `edgeWeight` - The distance between `currentCity` and `neighbor`.
+-- * `distances` - The list of current minimum distances to each city.
+-- * `queue` - The `Queue` tracking cities yet to be explored.
+-- * `parents` - A `CityParentNodes` list recording each city’s predecessors.
+--
+-- ### Returns:
+-- * Updated `CityDistances`, `Queue`, and `CityParentNodes` reflecting any relaxed paths.
+--
+-- ### Logic:
+-- * Compares the new potential distance (`newDist`) to `neighbor` with its current distance.
+-- * Updates `neighbor`'s distance if `newDist` is shorter, or appends `currentCity` as a predecessor if `newDist` matches the current distance.
+relaxNeighbor :: City -> City -> Distance -> CityDistances -> Queue -> CityParentNodes -> (CityDistances, Queue, CityParentNodes)
+relaxNeighbor currentCity neighbor edgeWeight distances queue parents =
+    let currentDist = getCityDistanceFromQueue queue neighbor
+        newDist = getDistFromRelaxedCity distances currentCity + edgeWeight
+    in case () of
+        _ | currentDist == infinite ->  -- Case 2: Distance is infinity, so must be relaxed
+              (updateCityDistance distances neighbor newDist, insertCityIntoQueue queue (neighbor, newDist), replaceCityParentNodes parents currentCity neighbor)
+          | newDist < currentDist ->   -- Case 3: Found a shorter path
+              (updateCityDistance distances neighbor newDist, updateCityDistanceInQueue queue neighbor newDist, replaceCityParentNodes parents currentCity neighbor)
+          | newDist == currentDist ->  -- Case 4: Found an alternative path
+              (distances, queue, appendCityPredecessor parents currentCity neighbor)
+          | otherwise ->               -- Case 1 or default: No update needed
+              (distances, queue, parents)
+
+
+-- | Checks if a city has any recorded predecessors in the `CityParentNodes`.
+--
+-- ### Arguments:
+-- * `cityParents` - A `CityParentNodes` list recording each city’s predecessors.
+-- * `city` - The `City` to check for predecessors.
+--
+-- ### Returns:
+-- * `True` if `city` has any recorded predecessors; `False` otherwise.
+--
+-- ### Logic:
+-- * Uses `any` to check if `city` is present in `cityParents`, meaning it has recorded predecessors.
+cityHasPredecessors :: CityParentNodes -> City -> Bool
+cityHasPredecessors cityParents city =
+    any ((== city) . fst) cityParents
+
+-- | Replaces the predecessors of a city with a new predecessor.
+--
+-- ### Arguments:
+-- * `cityParents` - A `CityParentNodes` list containing each city’s predecessors.
+-- * `citySource` - The `City` to set as the new predecessor.
+-- * `cityDest` - The destination `City` whose predecessor list will be updated.
+--
+-- ### Returns:
+-- * An updated `CityParentNodes` list where `cityDest` has `citySource` as its sole predecessor.
+--
+-- ### Logic:
+-- * Calls `updateCityPredecessors` to replace `cityDest`'s predecessors with `[citySource]`, effectively resetting the predecessor list.
+replaceCityParentNodes :: CityParentNodes -> City -> City -> CityParentNodes
+replaceCityParentNodes cityParents citySource cityDest = updateCityPredecessors cityParents cityDest [citySource]
+
+-- | Appends a new predecessor to the existing list for a city.
+--
+-- ### Arguments:
+-- * `cityParents` - A `CityParentNodes` list containing each city’s predecessors.
+-- * `citySource` - The new predecessor `City` to add for `cityDest`.
+-- * `cityDest` - The destination `City` whose predecessor list will be updated.
+--
+-- ### Returns:
+-- * An updated `CityParentNodes` list where `citySource` is added to `cityDest`'s list of predecessors.
+--
+-- ### Logic:
+-- * Uses `getPredecessors` to retrieve `cityDest`'s current predecessors.
+-- * Calls `updateCityPredecessors` to update `cityDest` with `citySource` prepended to the existing list.
+appendCityPredecessor :: CityParentNodes -> City -> City -> CityParentNodes
+appendCityPredecessor cityParents citySource cityDest =
+    let existingPreds = getPredecessors cityParents cityDest
+    in updateCityPredecessors cityParents cityDest (citySource : existingPreds)
+
+-- | Retrieves the predecessors of a city.
+--
+-- ### Arguments:
+-- * `cityParents` - A `CityParentNodes` list containing cities and their predecessor nodes.
+-- * `city` - The city for which to retrieve predecessors.
+--
+-- ### Returns:
+-- * A list of `City` names that are the predecessors of the specified city.
+-- * Returns an empty list if the city has no predecessors recorded.
+--
+-- ### Logic:
+-- * Uses `lookup` to find the city’s predecessors in `cityParents`.
+getPredecessors :: CityParentNodes -> City -> [City]
+getPredecessors cityParents city =
+    case lookup city cityParents of
+        Just preds -> preds
+        Nothing -> []  -- If city is not found, return an empty list.
+
+-- | Helper function to update the predecessors list for a specific city.
+--
+-- ### Arguments:
+-- * `cityParents` - A `CityParentNodes` list of cities and their predecessor nodes.
+-- * `city` - The city for which to update the predecessors list.
+-- * `preds` - A list of new predecessors to associate with the specified city.
+--
+-- ### Returns:
+-- * An updated `CityParentNodes` list where the specified city's predecessors are replaced by `preds`.
+--
+-- ### Logic:
+-- * Inserts a tuple `(city, preds)` at the beginning of `cityParents` and removes any existing entry for `city`.
+updateCityPredecessors :: CityParentNodes -> City -> [City] -> CityParentNodes
+updateCityPredecessors cityParents city preds =
+    (city, preds) : filter ((/= city) . fst) cityParents
+
+-- | Finds the city with the smallest distance from the Queue.
+--
+-- ### Arguments:
+-- * `queue` - A `Queue` list of `(City, Distance)` pairs representing the cities to explore.
+--
+-- ### Returns:
+-- * The `City` with the smallest associated distance in the queue.
+--
+-- ### Logic:
+-- * Uses `Data.List.minimumBy` to compare distances in the queue and retrieve the city with the shortest distance.
+extractMinCity :: Queue -> City
+extractMinCity queue = fst (Data.List.minimumBy (\(_, d1) (_, d2) -> compare d1 d2) queue)
+
+-- | Retrieves the distance of a city from the Queue.
+--
+-- ### Arguments:
+-- * `queue` - A `Queue` list of `(City, Distance)` pairs representing the current cities.
+-- * `city` - The city for which to retrieve the distance.
+--
+-- ### Returns:
+-- * The `Distance` of the specified `city` if it exists in the queue.
+-- * Returns a large "infinite" value if the city is not in the queue.
+--
+-- ### Logic:
+-- * Uses `Data.List.find` to locate the `city` in the queue and retrieve its distance if available;
+--   otherwise, returns `infinite`.
+getCityDistanceFromQueue :: Queue -> City -> Distance
+getCityDistanceFromQueue queue city =
+    maybe infinite snd (Data.List.find (\(c, _) -> c == city) queue)
+
+-- | Removes a city from the Queue.
+--
+-- ### Arguments:
+-- * `queue` - A `Queue` list of `(City, Distance)` pairs representing the current cities.
+-- * `city` - The city to be removed from the queue.
+--
+-- ### Returns:
+-- * A new `Queue` with the specified `city` removed.
+--
+-- ### Logic:
+-- * Uses `filter` to remove the tuple associated with the specified `city` from the queue.
+deleteCityFromQueue :: Queue -> City -> Queue
+deleteCityFromQueue queue city = filter (\(c, _) -> c /= city) queue
+
+-- | Inserts a city into the sorted Queue.
+--
+-- ### Arguments:
+-- * `queue` - A `Queue` list of `(City, Distance)` pairs, sorted by distance.
+-- * `elem` - A `(City, Distance)` tuple to insert into the queue.
+--
+-- ### Returns:
+-- * A new `Queue` with the specified `elem` inserted, maintaining order by distance.
+--
+-- ### Logic:
+-- * Compares the distance of `elem` with each city in the queue and inserts it in the correct position
+--   to keep the queue sorted by distance.
+insertCityIntoQueue :: Queue -> DistanceCityTuple -> Queue
+insertCityIntoQueue [] elem = [elem]
+insertCityIntoQueue queue@(x@(c, d):xs) elem@(c', d')
+    | d' < d    = elem : queue
+    | otherwise = x : insertCityIntoQueue xs elem
+
+
+-- | Updates the distance of a city in the Queue.
+--
+-- ### Arguments:
+-- * `queue` - A list of `DistanceCityTuple` representing the priority queue of cities.
+-- * `city` - The specific city whose distance needs to be updated.
+-- * `newDist` - The new distance value to assign to the specified city.
+--
+-- ### Returns:
+-- * A `Queue` where the distance for the specified `city` is updated to `newDist`.
+--
+-- ### Logic:
+-- * Uses `map` to iterate through the queue, updating the distance for the specified `city` while leaving other cities unaffected.
+updateCityDistanceInQueue :: Queue -> City -> Distance -> Queue
+updateCityDistanceInQueue queue city newDist = map (\(c, d) -> (c, if c == city then newDist else d)) queue
+
+-- | Updates the distance of a city in the relaxed (visited) cities list.
+--
+-- ### Arguments:
+-- * `distances` - A list of pairs `(City, Distance)` representing the distances of cities visited so far.
+-- * `city` - The city whose distance in the list needs to be updated.
+-- * `newDist` - The new distance value to assign to the specified city.
+--
+-- ### Returns:
+-- * An updated `CityDistances` list where the specified city's distance is set to `newDist`.
+--
+-- ### Logic:
+-- * Iterates over `distances` using `map`, replacing the distance for the specified `city` with `newDist` while keeping other cities’ distances the same.
+updateCityDistance :: CityDistances -> City -> Distance -> CityDistances
+updateCityDistance distances city newDist = map (\(c, d) -> (c, if c == city then newDist else d)) distances
+
+-- | Retrieves the distance of a city from the relaxed (visited) cities list.
+--
+-- ### Arguments:
+-- * `distances` - A list of pairs `(City, Distance)` representing distances for each visited city.
+-- * `city` - The city for which to retrieve the distance.
+--
+-- ### Returns:
+-- * The `Distance` associated with the specified `city` if it exists in `distances`.
+-- * Returns a large "infinite" value if the city is not found, indicating that the city is unvisited or unreachable.
+--
+-- ### Logic:
+-- * Uses `Data.List.find` to locate the `city` in `distances`. If found, it returns the associated distance;
+--   otherwise, it returns `infinite` as a default value.  
+getDistFromRelaxedCity :: CityDistances -> City -> Distance
+getDistFromRelaxedCity distances city =
+    maybe infinite snd (Data.List.find (\(c, _) -> c == city) distances)
+
+-- | Finds all the shortest paths from a source city to a target city using Dijkstra's algorithm.
+--
+-- ### Arguments:
+-- * `roadMap` - A `RoadMap` containing the connections and distances between cities.
+-- * `startCity` - The city from which the search for shortest paths begins.
+-- * `endCity` - The city to which all shortest paths are calculated.
+--
+-- ### Returns:
+-- * A list of `Path`s, where each `Path` is a list of `City` names representing a unique shortest path from
+--   `startCity` to `endCity`.
+--
+-- ### Logic:
+-- * Calls `shortestPathDijkstra`, which applies Dijkstra's algorithm to find and backtrack all shortest paths
+--   from `startCity` to `endCity` in the `roadMap`.
 shortestPath :: RoadMap -> City -> City -> [Path]
-shortestPath roadMap source destination =
-    [map fst path | path <- allPaths, totalDistPath path == minDistance]
-  where
-    allPaths = allPathsWithDistances roadMap source destination []
-    minDistance = minimum (map totalDistPath allPaths)
+shortestPath = shortestPathDijkstra
 
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -181,15 +693,13 @@ type VisitedArray = [Int]
 -- * This type is used to store and compare possible paths and their distances in the TSP algorithm.
 type PathAndDistance = ([Int], Distance)
 
--- | A constant representing a large "infinity" value used to denote no connection between cities.
---
--- ### Definition:
--- * `inf` is set to a large integer value, `1000000000000`.
---
--- ### Usage:
--- * Used as a placeholder for "infinite" distance where cities are not directly connected in the matrix.
-inf :: Int
-inf = 1000000000000  -- or any large number you choose
+
+adjacentCityDistances :: RoadMap -> City -> [DistanceCityTuple]
+adjacentCityDistances roadMap city = [(city2, dist) | (city1, city2, dist) <- roadMap, city1 == city] ++ [(city1, dist) | (city1, city2, dist) <- roadMap, city2 == city]
+
+
+totalDistPath :: PathDistances -> Distance
+totalDistPath = sum . map snd
 
 -- | Maps a list of cities to unique integer IDs, starting from a specified ID.
 --
@@ -241,14 +751,14 @@ convertPath ids citiesToIds = map (getCityFromCitiesToIDs citiesToIds) ids
 -- * `city2` - The destination city.
 --
 -- ### Returns:
--- * The `Distance` between `city1` and `city2` if they are connected; otherwise, returns `inf`.
+-- * The `Distance` between `city1` and `city2` if they are connected; otherwise, returns `infinite`.
 --
 -- ### Logic:
 -- * Uses `findDistance` to get the distance between `city1` and `city2` (in either direction).
--- * If `findDistance` returns `Nothing`, returns `inf`.
+-- * If `findDistance` returns `Nothing`, returns `infinite`.
 getDistanceBetweenCities :: RoadMap -> City -> City -> Distance
 getDistanceBetweenCities roadMap city1 city2 =
-    maybe inf snd (findDistance roadMap city1 city2)
+    maybe infinite snd (findDistance roadMap city1 city2)
 
 -- | Finds the distance between two cities, searching for connections in both directions.
 --
@@ -316,7 +826,6 @@ getVisited index visitedArray = visitedArray !! index
 --
 -- ### Logic:
 -- * Uses `take` and `drop` to set the bit at `index` to 1 while preserving the rest of the list.
-
 setVisited :: Int -> VisitedArray -> VisitedArray
 setVisited index visitedArray = take index visitedArray ++ [1] ++ drop (index + 1) visitedArray
 
@@ -354,7 +863,7 @@ areAllVisited = all (== 1)
 -- * Otherwise, it retains the previous best path and distance.
 updateBestPath :: Int -> [Int] -> Distance -> Matrix -> [Int] -> Distance -> PathAndDistance
 updateBestPath currCity currPath currDist matrix bestPath bestDist
-    | returnToStart /= inf && currDist + returnToStart < bestDist =
+    | returnToStart /= infinite && currDist + returnToStart < bestDist =
         (currPath ++ [0], currDist + returnToStart)
     | otherwise = (bestPath, bestDist)
     where
@@ -652,7 +1161,14 @@ roadMap' = [
 
 main :: IO ()
 main = do
-    return()
+    print (cities roadMap)
+    print (areAdjacent roadMap "City1" "City2")
+    print (distance roadMap "City1" "City2")
+    print (adjacent roadMap "City1")
+    print (rome roadMap)
+    print (pathDistance roadMap ["City1", "City2", "City3"])
+    print (isStronglyConnected gTest1)
+    print (shortestPath gTest1 "0" "4")
+    print (shortestPath roadMap "City1" "City15") 
+    print (travelSales roadMap')
 
---call travelSales with BF when n! < 2^n * n^2
---n = 7
