@@ -21,7 +21,7 @@ José Costa - up202207871@up.pt
 - travelSales (task 9)
 
 
-#### ShortestPath Explanation:
+### ShortestPath Explanation:
 
 The shortestPath function implements Dijkstra's algorithm to find the shortest paths from a source city to a target city within a road map represented as a graph.
 
@@ -75,7 +75,7 @@ Even though we couldn't implement a heap fully in nature, we made it in a way , 
 
 **CityDistances** and **CityParentNodes**: These lists are effective for managing distance and predecessor information. While other structures like dictionaries could be used for faster lookups, the tuple lists provide simplicity in maintaining order and iterating through the cities.
 
-#### TravelSales Explanation:
+### TravelSales Explanation:
 
 The `travelSales` function is designed to solve the Traveling Salesman Problem (TSP) using two distinct approaches: a brute-force method that computes all possible paths and their corresponding distances, yielding the smallest one, and a dynamic programming approach that utilizes a list to represent visited cities, akin to bit masking.
 
