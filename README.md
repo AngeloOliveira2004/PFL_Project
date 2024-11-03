@@ -6,14 +6,14 @@
 José Costa - up202207871@up.pt
 
 ### Tasks Performed by each member:
-#### Ângelo Oliveira:
+#### Ângelo Oliveira (50%):
 - areAdjacent (task 2)
 - adjacent (task 4)
 - rome (task 6)
 - isStronglyConnected (task 7)
 - shortestPath (task 8)
 
-#### José Costa
+#### José Costa (50%):
 - cities (task 1)
 - distance (task 3)
 - pathDistance (task 5)
