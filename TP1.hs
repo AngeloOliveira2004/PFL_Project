@@ -11,51 +11,6 @@ type Distance = Int
 
 type RoadMap = [(City,City,Distance)]
 
-data Heap a = Empty | Node a (Heap a) (Heap a) deriving Show -- A heap is either empty or a node with a value (a) and two heaps
-
--- Merges two heaps
-merge :: (Ord a) => Heap a -> Heap a -> Heap a
-merge Empty h = h -- If the first heap is empty, return the second heap
-merge h Empty = h -- If the second heap is empty, return the first heap
-merge h1@(Node x left1 right1) h2@(Node y left2 right2)
-    | x <= y    = Node x (merge right1 h2) left1
-    | otherwise = Node y (merge right2 h1) left2
-
--- Inserts a value into a heap
-insert :: (Ord a) => a -> Heap a -> Heap a
-insert x h = merge (Node x Empty Empty) h 
-
-findMinValue :: (Ord a) => Heap a -> a
-findMinValue Empty = error "Empty heap"
-findMinValue (Node x _ _) = x
-
-deleteMinValue :: (Ord a) => Heap a -> Heap a
-deleteMinValue Empty = error "Empty heap"
-deleteMinValue (Node _ left right) = merge left right
-
-isEmpty :: (Ord a) => Heap a -> Bool
-isEmpty Empty = True
-isEmpty _ = False
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 -- Remove duplicates from a list
 nub :: Eq a => [a] -> [a]
 nub [] = [] -- If the list is empty, return an empty list
@@ -272,36 +227,139 @@ solveTSP matrix currMask currCity currPath bestPath currDist bestDist
 
 -- 4.8 Dijkstra's algorithm
 
-type DistanceCityTuple = (City, Distance) -- Represents a city and the distance to it
-type PathDistances = [DistanceCityTuple] -- Represents a path with with a city root and the distance to it
+type MinHeap = [(City,Distance)]
 
-getAllCitiesExceptOne :: [City] -> City -> [City]
-getAllCitiesExceptOne allCities city = filter (/=city) allCities
+type CityDistances = [(City,Distance)]
 
-initializePathDistance :: City -> [City] -> PathDistances
-initializePathDistance startCity cities = [(city, if city == startCity then 0 else 1000000) | city <- cities]
+type CityParentNodes = [(City,[City])]
 
-fillHeap :: [PathDistances] -> Heap(PathDistances)
-fillHeap cities = foldr insert Empty cities
+-- Finds all the shortest path from a source city to a target city using Dijkstra's algorithm.
+-- Entry point for finding all shortest paths from startCity to endCity
+shortestPathDijkstra :: RoadMap -> City -> City -> [Path]
+shortestPathDijkstra rm startCity endCity = getAllShortestPaths cityParentNodes endCity
+    where
+        (initialDistances, initialHeap, initialPredecessors) = initializeDijkstra rm startCity
+        (_, _, cityParentNodes) = dijkstra rm initialDistances initialHeap initialPredecessors
 
-dijkstra :: RoadMap -> City -> City -> Path
-dijkstra roadMap startCity endCity =
-    let allCities = getAllCitiesExceptOne (cities roadMap) startCity
-        pathDistances = initializePathDistance startCity allCities
-        initHeap = fillHeap [pathDistances]
-    in
-        dijkstraAux roadMap endCity initHeap []
+-- Sets up initial distances, heap, and predecessors for Dijkstra's algorithm
+initializeDijkstra :: RoadMap -> City -> (CityDistances, MinHeap, CityParentNodes)
+initializeDijkstra rm startCity = 
+    let initialDistances = map (\city -> (city, if city == startCity then 0 else 1000000)) (cities rm)
+        initialHeap = [(startCity, 0)]
+        initialPredecessors = [(startCity, [])]
+    in (initialDistances, initialHeap, initialPredecessors)
 
-dijkstraAux :: RoadMap -> City -> Heap(PathDistances) -> Path -> Path
-dijkstraAux roadMap endCity heap visited
-    | isEmpty heap = []
-    | currentCity == endCity = reverse (currentCity:visited) 
+-- Wrapper function to get all shortest paths by backtracking from endCity to startCity
+getAllShortestPaths :: CityParentNodes -> City -> [Path]
+getAllShortestPaths cityParentNodes endCity = findPathsFromCityParentNodes cityParentNodes endCity [endCity]
+
+
+-- Recursively finds all possible paths from the target city to the source using the city predecessors.
+findPathsFromCityParentNodes :: CityParentNodes -> City -> Path -> [Path]
+findPathsFromCityParentNodes cityParentNodes targetCity currPath =
+    case getPredecessors cityParentNodes targetCity of
+        [] -> [currPath]
+        preds -> concatMap (\pred -> findPathsFromCityParentNodes cityParentNodes pred (pred : currPath)) preds
+
+-- The Dijkstra algorithm implementation to find the shortest path in a roadmap
+dijkstra :: RoadMap -> CityDistances -> MinHeap -> CityParentNodes -> (CityDistances, MinHeap, CityParentNodes)
+dijkstra rm cityDistances heap cityParentNodes
+    | null heap = (cityDistances, heap, cityParentNodes)  -- If heap is empty, we’re done
     | otherwise = 
-        let 
-            currentValue = findMinValue heap
-            newHeap = deleteMinValue heap
+        let currentCity = extractMinCity heap
+            updatedHeap = deleteCityFromHeap heap currentCity
+            unvisitedNeighbors = filterUnvisitedNeighbors rm updatedHeap cityParentNodes currentCity
+            (updatedDistances, newHeap, updatedPredecessors) = relaxNeighbors currentCity unvisitedNeighbors cityDistances updatedHeap cityParentNodes
+        in dijkstra rm updatedDistances newHeap updatedPredecessors
+
+filterUnvisitedNeighbors :: RoadMap -> MinHeap -> CityParentNodes -> City -> [(City, Distance)]
+filterUnvisitedNeighbors rm heap cityParentNodes currentCity =
+    filter (\(city, _) -> not (cityHasPredecessors cityParentNodes city && getCityDistanceFromHeap heap city == 1000000)) (adjacent rm currentCity)
+
+relaxNeighbors :: City -> [(City, Distance)] -> CityDistances -> MinHeap -> CityParentNodes -> (CityDistances, MinHeap, CityParentNodes)
+relaxNeighbors currentCity neighbors cityDistances heap cityParentNodes =
+    foldl (\(distancesAcc, heapAcc, predecessorsAcc) (neighbor, edgeW) ->
+               relaxNeighbor currentCity neighbor edgeW distancesAcc heapAcc predecessorsAcc
+           ) (cityDistances, heap, cityParentNodes) neighbors
+
+relaxNeighbor :: City -> City -> Distance -> CityDistances -> MinHeap -> CityParentNodes -> (CityDistances, MinHeap, CityParentNodes)
+relaxNeighbor currentCity neighbor edgeWeight distances heap parents =
+    let currentDist = getCityDistanceFromHeap heap neighbor
+        newDist = getDistFromRelaxedCity distances currentCity + edgeWeight
+    in case () of
+        _ | currentDist == 1000000 ->  -- Case 2: Distance is infinity, so must be relaxed
+              (updateCityDistance distances neighbor newDist, insertCityIntoHeap heap (neighbor, newDist), replaceCityParentNodes parents currentCity neighbor)
+          | newDist < currentDist ->   -- Case 3: Found a shorter path
+              (updateCityDistance distances neighbor newDist, updateCityDistanceInHeap heap neighbor newDist, replaceCityParentNodes parents currentCity neighbor)
+          | newDist == currentDist ->  -- Case 4: Found an alternative path
+              (distances, heap, appendCityPredecessor parents currentCity neighbor)
+          | otherwise ->               -- Case 1 or default: No update needed
+              (distances, heap, parents)
+
+-- Checks if a city has any recorded predecessors.
+cityHasPredecessors :: CityParentNodes -> City -> Bool
+cityHasPredecessors originCities city =
+    any (\(c, _) -> c == city) originCities
+
+-- Replaces the predecessors of a city with a new predecessor.
+replaceCityParentNodes :: CityParentNodes -> City -> City -> CityParentNodes
+replaceCityParentNodes [] citySource cityDest = [(cityDest, [citySource])]  -- If list is empty, insert new pair
+replaceCityParentNodes ((c, sources):rest) citySource cityDest
+    | c == cityDest = (cityDest, [citySource]) : rest  -- Replace the existing list with [citySource]
+    | otherwise     = (c, sources) : replaceCityParentNodes rest citySource cityDest
+
+-- Appends a new predecessor to the existing list for a city.
+appendCityPredecessor :: CityParentNodes -> City -> City -> CityParentNodes
+appendCityPredecessor [] citySource cityDest = [(cityDest, [citySource])]  -- If list is empty, insert new pair
+appendCityPredecessor ((c, sources):rest) citySource cityDest
+    | c == cityDest = (cityDest, citySource : sources) : rest  -- Append citySource to the existing list
+    | otherwise     = (c, sources) : appendCityPredecessor rest citySource cityDest
+
+getPredecessors :: CityParentNodes -> City -> [City]
+getPredecessors [] _ = []
+getPredecessors ((city, predecessors):rest) targetCity
+    | city == targetCity = predecessors
+    | otherwise = getPredecessors rest targetCity
+
+-- Finds the city with the smallest distance from the min-heap.
+extractMinCity :: MinHeap -> City
+extractMinCity minHeap = fst (foldl (\acc@(_, accDist) pair@(_, dist) -> if dist < accDist then pair else acc) ("",100000) minHeap)
+
+-- Retrieves the distance of a city from the min-heap.
+getCityDistanceFromHeap :: MinHeap -> City -> Distance
+getCityDistanceFromHeap [] _ = 1000000  -- If city is not found, return a large "infinity" value.
+getCityDistanceFromHeap ((city, dist):xs) targetCity
+    | city == targetCity = dist
+    | otherwise = getCityDistanceFromHeap xs targetCity
+
+-- Removes a city from the min-heap.
+deleteCityFromHeap :: MinHeap -> City -> MinHeap
+deleteCityFromHeap minHeap city =
+    filter (\(c, _) -> c /= city) minHeap
+
+-- Insert a city into the sorted min-heap
+insertCityIntoHeap :: MinHeap -> (City, Distance) -> MinHeap
+insertCityIntoHeap [] elem = [elem]
+insertCityIntoHeap heap@(x@(c, d):xs) elem@(c', d')
+    | d' < d    = elem : heap
+    | otherwise = x : insertCityIntoHeap xs elem
+
+-- Updates the distance of a city in the min-heap.
+updateCityDistanceInHeap :: MinHeap -> City -> Distance -> MinHeap
+updateCityDistanceInHeap heap city newDist =
+    [(c, if c == city then newDist else d) | (c, d) <- heap]
 
 
+-- Updates the distance of a city in the relaxed (visited) cities list.
+updateCityDistance :: CityDistances -> City -> Distance -> CityDistances
+updateCityDistance distances city newDist =
+    [(c, if c == city then newDist else d) | (c, d) <- distances]
+
+
+-- Retrieves the distance of a city from the relaxed cities list.
+getDistFromRelaxedCity :: CityDistances -> City -> Distance
+getDistFromRelaxedCity distances city = 
+    maybe 1000000 snd (Data.List.find (\(c, _) -> c == city) distances)
 
 
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -379,4 +437,7 @@ main = do
   print (travelSales gTest2)
 -}
   putStrLn "Testing gTest1:"
-  print (shortestPath gTest1 "0" "8")
+  print (shortestPath gTest1 "0" "4")
+
+  putStrLn "Testing gTest1:"
+  print (shortestPathDijkstra gTest1 "0" "4")
