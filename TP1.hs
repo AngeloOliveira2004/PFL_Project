@@ -547,19 +547,26 @@ getCityDistanceFromQueue :: Queue -> City -> Distance
 getCityDistanceFromQueue queue city =
     maybe infinite snd (Data.List.find (\(c, _) -> c == city) queue)
 
--- | Removes a city from the Queue.
+-- | Deletes a specified city from the Queue.
 --
 -- ### Arguments:
--- * `queue` - A `Queue` list of `(City, Distance)` pairs representing the current cities.
--- * `city` - The city to be removed from the queue.
+-- * `queue` - A `Queue` list of `(City, Int)` pairs representing the current cities.
+-- * `city` - The city to be deleted from the queue.
 --
 -- ### Returns:
--- * A new `Queue` with the specified `city` removed.
+-- * A new `Queue` without the specified `city`.
 --
 -- ### Logic:
--- * Uses `filter` to remove the tuple associated with the specified `city` from the queue.
+-- * Recursively traverses the `queue`, constructing a new list that excludes the specified `city`.
+-- * The function checks each city in the queue, and if it matches the specified city, it skips that city; 
+--   otherwise, it retains it in the new list.
 deleteCityFromQueue :: Queue -> City -> Queue
-deleteCityFromQueue queue city = filter (\(c, _) -> c /= city) queue
+deleteCityFromQueue queue city = go queue
+  where
+    go [] = []  -- If the queue is empty, return an empty list
+    go (x@(c, _):xs)
+      | c == city = go xs  -- Skip the current city if it matches
+      | otherwise = x : go xs  -- Keep the current city and continue
 
 -- | Inserts a city into the sorted Queue.
 --
